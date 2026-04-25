@@ -25,13 +25,13 @@ Use this folder for Streamer.bot deployment:
 
 - `src\TwitchHeists.StreamerBot.Bridge\bin\Release\net48\`
 
-Keep the full output folder together so the bridge can load its dependent DLLs, `appsettings.json`, and the SQLite provider files. The bridge also builds a `netstandard2.0` target for automated tests, but Streamer.bot users should use the `net48` output.
+Keep the full output folder together so the bridge can load its dependent DLLs, `appsettings.json`, `heist-messages.json`, and the SQLite provider files. The bridge also builds a `netstandard2.0` target for automated tests, but Streamer.bot users should use the `net48` output.
 
 Streamer.bot inline C# should load `TwitchHeists.StreamerBot.Bridge.dll` from that install folder at runtime with `Assembly.LoadFrom(...)` rather than relying on a direct external action reference.
 
 ## Database and configuration
 
-The default configuration file is copied into the bridge output as `appsettings.json`.
+The default configuration files are copied into the bridge output as `appsettings.json` and `heist-messages.json`.
 
 Default SQLite location:
 
@@ -44,6 +44,17 @@ Default SQLite location:
 ```
 
 The bridge resolves the database under `data\twitch-heists.db` inside the install folder and creates the `data\` directory on first use.
+
+`heist-messages.json` controls all heist chat text:
+
+- start messages
+- cooldown messages
+- countdown reminders
+- success headlines and callouts
+- failure headlines and callouts
+- final result summaries
+
+Edit that JSON file in the deployed bridge folder to add, remove, or rewrite heist lines without rebuilding the DLLs.
 
 ## Streamer.bot wiring
 
@@ -72,6 +83,8 @@ All bridge methods return a `BridgeResult` with `Success`, `Message`, `RewardedV
 ## Default heist settings
 
 - Join window: `00:02:00`
+- Cooldown window: `00:05:00`
+- Reminder thresholds: `00:01:00`, `00:00:30`, `00:00:10`
 - Success chance floor: `40%`
 - Success chance ceiling: `75%`
 - Max winners: `5`
@@ -83,6 +96,8 @@ All bridge methods return a `BridgeResult` with `Success`, `Message`, `RewardedV
 - Reward cycles are idempotent per timestamp, so retries do not double-award watchtime or points.
 - Chat-only presence expires at the next refresh boundary if the viewer never appears in the Community snapshot.
 - Heist stake reservations and resolutions run inside transactions so points and round state stay aligned.
+- `!heist` opens a 2-minute join window, sends 1m / 30s / 10s countdown reminders through the heist timer action, and enforces a 5-minute cooldown after results.
+- `heist-messages.json` drives every heist chat line with placeholder tokens such as `{starter}`, `{stake}`, `{joinWindow}`, `{cooldownRemaining}`, `{countdown}`, `{pot}`, `{participantCount}`, `{winner}`, `{loser}`, `{payout}`, `{winnerCount}`, `{loserCount}`, `{resolvedPot}`, and `{successChancePercent}`.
 - `!points give` transfers existing balance from the sender to the target; it does not mint new points.
 - `!points add all` and `!points remove all` target viewers currently marked active in TwitchHeists presence tracking.
 - `!watchtime` reads lifetime rewarded watch minutes from the same SQLite balance store.

@@ -22,6 +22,10 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <TargetPath>appsettings.json</TargetPath>
     </None>
+    <None Include="Configuration\heist-messages.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>heist-messages.json</TargetPath>
+    </None>
   </ItemGroup>
 
 </Project>

@@ -13,6 +13,7 @@
   <ItemGroup>
     <None Update="Configuration\bridge-readme.txt" CopyToOutputDirectory="PreserveNewest" TargetPath="bridge-readme.txt" />
     <None Include="..\TwitchHeists.StreamerBot\Configuration\appsettings.json" Link="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\TwitchHeists.StreamerBot\Configuration\heist-messages.json" Link="heist-messages.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <PropertyGroup>

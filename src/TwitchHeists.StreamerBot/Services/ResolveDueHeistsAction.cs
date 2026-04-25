@@ -1,4 +1,5 @@
-using System.Globalization;
+using TwitchHeists.Core.Models;
+using TwitchHeists.Core.Options;
 using TwitchHeists.Core.Services;
 using TwitchHeists.Data.Sqlite.Repositories;
 using TwitchHeists.StreamerBot.Contracts;
@@ -10,19 +11,31 @@ public sealed class ResolveDueHeistsAction
     private readonly HeistRepository heistRepository;
     private readonly HeistChanceCalculator heistChanceCalculator;
     private readonly HeistResolver heistResolver;
+    private readonly HeistSettings heistSettings;
+    private readonly HeistMessageComposer messageComposer;
 
     public ResolveDueHeistsAction(
         HeistRepository heistRepository,
         HeistChanceCalculator heistChanceCalculator,
-        HeistResolver heistResolver)
+        HeistResolver heistResolver,
+        HeistSettings heistSettings,
+        HeistMessageComposer messageComposer)
     {
         this.heistRepository = heistRepository;
         this.heistChanceCalculator = heistChanceCalculator;
         this.heistResolver = heistResolver;
+        this.heistSettings = heistSettings;
+        this.messageComposer = messageComposer;
     }
 
     public ActionResponseDto Execute(DateTimeOffset nowUtc)
     {
+        var reminder = TryBuildReminder(nowUtc);
+        if (reminder is not null)
+        {
+            return reminder;
+        }
+
         var dueRounds = heistRepository.GetDueOpenRounds(nowUtc);
         if (dueRounds.Count == 0)
         {
@@ -43,14 +56,11 @@ public sealed class ResolveDueHeistsAction
             var totalStake = participants.Sum(participant => participant.StakeAmount);
             var successChance = heistChanceCalculator.CalculateSuccessChance(totalStake, participants.Count);
             var resolution = heistResolver.Resolve(round.RoundId, participants, successChance, nowUtc);
-            heistRepository.ApplyResolution(resolution);
+            heistRepository.ApplyResolution(resolution, nowUtc.Add(heistSettings.CooldownWindow));
 
             rewardedViewerCount += resolution.Winners.Count;
             totalPointsAwarded += resolution.Winners.Sum(winner => winner.PayoutAmount);
-            messages.Add(
-                resolution.FinalState == Core.Models.HeistRoundState.ResolvedSuccess
-                    ? $"Heist {round.RoundId:D} succeeded at {(successChance * 100m).ToString("0.##", CultureInfo.InvariantCulture)}%."
-                    : $"Heist {round.RoundId:D} failed at {(successChance * 100m).ToString("0.##", CultureInfo.InvariantCulture)}%.");
+            messages.Add(messageComposer.ComposeResolution(resolution));
         }
 
         return new ActionResponseDto
@@ -59,6 +69,46 @@ public sealed class ResolveDueHeistsAction
             Message = string.Join(" ", messages),
             RewardedViewerCount = rewardedViewerCount,
             TotalPointsAwarded = totalPointsAwarded
+        };
+    }
+
+    private ActionResponseDto? TryBuildReminder(DateTimeOffset nowUtc)
+    {
+        var round = heistRepository.GetOpenRound();
+        if (round is null || nowUtc >= round.ResolveAtUtc)
+        {
+            return null;
+        }
+
+        var remaining = round.ResolveAtUtc - nowUtc;
+
+        if (remaining <= heistSettings.TenSecondReminderThreshold && !round.TenSecondReminderSentAtUtc.HasValue)
+        {
+            heistRepository.MarkTenSecondReminderSent(round.RoundId, nowUtc);
+            return Success(messageComposer.ComposeReminder(round.OriginalPot, heistRepository.GetParticipants(round.RoundId).Count, "10 seconds"));
+        }
+
+        if (remaining <= heistSettings.ThirtySecondReminderThreshold && !round.ThirtySecondReminderSentAtUtc.HasValue)
+        {
+            heistRepository.MarkThirtySecondReminderSent(round.RoundId, nowUtc);
+            return Success(messageComposer.ComposeReminder(round.OriginalPot, heistRepository.GetParticipants(round.RoundId).Count, "30 seconds"));
+        }
+
+        if (remaining <= heistSettings.OneMinuteReminderThreshold && !round.OneMinuteReminderSentAtUtc.HasValue)
+        {
+            heistRepository.MarkOneMinuteReminderSent(round.RoundId, nowUtc);
+            return Success(messageComposer.ComposeReminder(round.OriginalPot, heistRepository.GetParticipants(round.RoundId).Count, "1 minute"));
+        }
+
+        return null;
+    }
+
+    private static ActionResponseDto Success(string message)
+    {
+        return new ActionResponseDto
+        {
+            Success = true,
+            Message = message
         };
     }
 }

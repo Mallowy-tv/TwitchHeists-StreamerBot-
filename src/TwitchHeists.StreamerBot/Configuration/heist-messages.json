@@ -1,0 +1,39 @@
+{
+  "startMessages": [
+    "{starter} started a heist with {stake} points. Starting in {joinWindow}."
+  ],
+  "cooldownMessages": [
+    "A new heist can start in {cooldownRemaining}."
+  ],
+  "reminderMessages": [
+    "Heist starts in {countdown}. Pot is now {pot} points across {participantCount} viewers."
+  ],
+  "successHeadlines": [
+    "The crew cracked the vault and got away clean.",
+    "The crew blasted through the alarms and escaped with the haul.",
+    "The getaway driver nailed the timing and the crew got out."
+  ],
+  "failureHeadlines": [
+    "Police captured the whole crew before anyone escaped.",
+    "The crew got boxed in and everyone was gunned down.",
+    "The alarms tripped early and the crew never made it out."
+  ],
+  "successCallouts": [
+    "{winner} slipped out with {payout} points.",
+    "{winner} dove into the van with {payout} points.",
+    "{winner} made it to the getaway car carrying {payout} points."
+  ],
+  "failureCallouts": [
+    "{loser} got left behind in the crossfire.",
+    "{loser} took a bullet covering the escape.",
+    "{loser} was hauled off in cuffs when the exit closed."
+  ],
+  "sacrificeCallouts": [
+    "{loser} took a bullet for {winner}.",
+    "{loser} held the line so {winner} could escape.",
+    "{loser} drew the heat long enough for {winner} to get out."
+  ],
+  "resultSummaries": [
+    "{winnerCount} got out with {resolvedPot} points while {loserCount} were left behind. Success chance was {successChancePercent}."
+  ]
+}

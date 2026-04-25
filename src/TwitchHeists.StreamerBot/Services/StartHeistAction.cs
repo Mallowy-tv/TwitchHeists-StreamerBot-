@@ -1,4 +1,3 @@
-using System.Globalization;
 using TwitchHeists.Core.Models;
 using TwitchHeists.Core.Options;
 using TwitchHeists.Data.Sqlite.Repositories;
@@ -10,11 +9,13 @@ public sealed class StartHeistAction
 {
     private readonly HeistRepository heistRepository;
     private readonly HeistSettings heistSettings;
+    private readonly HeistMessageComposer messageComposer;
 
-    public StartHeistAction(HeistRepository heistRepository, HeistSettings heistSettings)
+    public StartHeistAction(HeistRepository heistRepository, HeistSettings heistSettings, HeistMessageComposer messageComposer)
     {
         this.heistRepository = heistRepository;
         this.heistSettings = heistSettings;
+        this.messageComposer = messageComposer;
     }
 
     public ActionResponseDto Execute(HeistCommandDto command)
@@ -24,19 +25,24 @@ public sealed class StartHeistAction
             return Failure("Stake amount must be greater than zero.");
         }
 
+        var cooldownEndsAtUtc = heistRepository.GetActiveCooldownEndsAtUtc(command.OccurredAtUtc);
+        if (cooldownEndsAtUtc.HasValue)
+        {
+            return Failure(messageComposer.ComposeCooldown(cooldownEndsAtUtc.Value - command.OccurredAtUtc));
+        }
+
         try
         {
-            var roundId = heistRepository.StartRound(
+            heistRepository.StartRound(
                 CreateViewerIdentity(command),
                 command.StakeAmount,
                 command.OccurredAtUtc,
                 command.OccurredAtUtc.Add(heistSettings.JoinWindow));
-            var round = heistRepository.GetOpenRound();
 
             return new ActionResponseDto
             {
                 Success = true,
-                Message = $"{command.Username} started a heist with {command.StakeAmount.ToString("0.##", CultureInfo.InvariantCulture)} points. Round {roundId:D} closes at {round?.ResolveAtUtc:HH:mm:ss} UTC."
+                Message = messageComposer.ComposeStart(command.Username, command.StakeAmount, heistSettings.JoinWindow)
             };
         }
         catch (InvalidOperationException exception)

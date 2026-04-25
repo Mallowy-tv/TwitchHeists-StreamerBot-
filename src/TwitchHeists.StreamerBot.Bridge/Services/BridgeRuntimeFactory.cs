@@ -8,6 +8,7 @@ public sealed class BridgeRuntimeFactory
 {
     private const string DatabaseFileName = "twitch-heists.db";
     private const string ConfigurationFileName = "appsettings.json";
+    private const string HeistMessagesFileName = "heist-messages.json";
     private readonly ActionRuntimeFactory actionRuntimeFactory;
 
     public BridgeRuntimeFactory()
@@ -56,7 +57,8 @@ public sealed class BridgeRuntimeFactory
     {
         return actionRuntimeFactory.CreateStartHeistAction(
             BuildConnectionString(installDirectory),
-            ResolveConfigurationPath(installDirectory));
+            ResolveConfigurationPath(installDirectory),
+            ResolveHeistMessageTemplatesPath(installDirectory));
     }
 
     public JoinHeistAction CreateJoinHeistAction(string installDirectory)
@@ -68,7 +70,8 @@ public sealed class BridgeRuntimeFactory
     {
         return actionRuntimeFactory.CreateResolveDueHeistsAction(
             BuildConnectionString(installDirectory),
-            ResolveConfigurationPath(installDirectory));
+            ResolveConfigurationPath(installDirectory),
+            ResolveHeistMessageTemplatesPath(installDirectory));
     }
 
     private static string BuildConnectionString(string installDirectory)
@@ -93,6 +96,13 @@ public sealed class BridgeRuntimeFactory
 
         ValidateConfigurationFile(configurationPath);
         return configurationPath;
+    }
+
+    private static string? ResolveHeistMessageTemplatesPath(string installDirectory)
+    {
+        var validatedInstallDirectory = ValidateInstallDirectory(installDirectory);
+        var templatePath = Path.Combine(validatedInstallDirectory, HeistMessagesFileName);
+        return File.Exists(templatePath) ? templatePath : null;
     }
 
     private static string ValidateInstallDirectory(string installDirectory)

@@ -3,6 +3,7 @@ using TwitchHeists.Core.Options;
 using TwitchHeists.Core.Services;
 using TwitchHeists.Data.Sqlite.Repositories;
 using TwitchHeists.Data.Sqlite.Schema;
+using TwitchHeists.StreamerBot.Configuration;
 using TwitchHeists.StreamerBot.Services;
 
 namespace TwitchHeists.StreamerBot.Composition;
@@ -46,11 +47,12 @@ public sealed class ActionRuntimeFactory
         return new GetWatchtimeAction(viewerRepository);
     }
 
-    public StartHeistAction CreateStartHeistAction(string connectionString, string? configurationPath = null)
+    public StartHeistAction CreateStartHeistAction(string connectionString, string? configurationPath = null, string? heistMessageTemplatesPath = null)
     {
         var heistSettings = LoadHeistSettings(configurationPath);
         var heistRepository = new HeistRepository(connectionString, new SchemaBootstrapper());
-        return new StartHeistAction(heistRepository, heistSettings);
+        var messageComposer = CreateHeistMessageComposer(heistMessageTemplatesPath);
+        return new StartHeistAction(heistRepository, heistSettings, messageComposer);
     }
 
     public JoinHeistAction CreateJoinHeistAction(string connectionString)
@@ -59,14 +61,24 @@ public sealed class ActionRuntimeFactory
         return new JoinHeistAction(heistRepository);
     }
 
-    public ResolveDueHeistsAction CreateResolveDueHeistsAction(string connectionString, string? configurationPath = null)
+    public ResolveDueHeistsAction CreateResolveDueHeistsAction(string connectionString, string? configurationPath = null, string? heistMessageTemplatesPath = null)
     {
         var heistSettings = LoadHeistSettings(configurationPath);
         var heistRepository = new HeistRepository(connectionString, new SchemaBootstrapper());
+        var messageComposer = CreateHeistMessageComposer(heistMessageTemplatesPath);
         return new ResolveDueHeistsAction(
             heistRepository,
             new HeistChanceCalculator(heistSettings),
-            new HeistResolver(heistSettings));
+            new HeistResolver(heistSettings),
+            heistSettings,
+            messageComposer);
+    }
+
+    private static HeistMessageComposer CreateHeistMessageComposer(string? heistMessageTemplatesPath)
+    {
+        var loader = new HeistMessageTemplateLoader();
+        HeistMessageTemplates templates = loader.Load(heistMessageTemplatesPath);
+        return new HeistMessageComposer(templates);
     }
 
     private static RewardSettings LoadRewardSettings(string? configurationPath)

@@ -1,134 +1,196 @@
-# Bulk Points All Implementation Plan
+# Heist Conversation Templates Implementation Plan
 
-**Goal:** Add an `all` target for mod-only `!points add` and `!points remove` so those commands affect every viewer currently active in the TwitchHeists presence table.
-**Architecture:** Reuse `viewer_presence.is_active = 1` as the source of truth for “currently present in this stream session.” Extend the repository with active-viewer bulk adjustment support, then teach the existing add/remove StreamerBot actions to treat `TargetUsername == "all"` as a bulk operation while leaving `!points give` single-target only. Keep the bridge surface stable so Streamer.bot snippets only need to pass the literal target string `all`.
-**Tech Stack:** C#, .NET Standard 2.0 libraries, .NET Framework 4.8 bridge assembly, SQLite, xUnit.
+**Goal:** Move all heist chat text into a dedicated JSON template file so start, reminder, cooldown, success, and failure messages can be changed without rebuilding the DLLs.
+**Architecture:** Keep the message-template feature inside the StreamerBot-facing layer because it is presentation behavior, not heist math or persistence. Ship a `heist-messages.json` file alongside `appsettings.json`, load it through the existing bridge/runtime setup, and have the start and resolver actions compose chat lines from typed template data plus live round data.
+**Tech Stack:** C#, .NET, System.Text.Json, Streamer.bot bridge, xUnit.
 
 ## File map
 
 | Action | Path | Responsibility |
 |---|---|---|
-| Modify | `src\TwitchHeists.Data.Sqlite\Repositories\ViewerRepository.cs` | Query active viewers and apply bulk add/remove operations transactionally |
-| Modify | `src\TwitchHeists.StreamerBot\Services\AddPointsAction.cs` | Detect `all`, apply bulk add to active viewers, and return a summary message |
-| Modify | `src\TwitchHeists.StreamerBot\Services\RemovePointsAction.cs` | Detect `all`, apply bulk remove with per-viewer clamp, and return a summary message |
-| Modify | `tests\TwitchHeists.Tests\PointsActionsTests.cs` | Cover bulk add/remove behavior, empty-active-list handling, and single-target regression safety |
-| Modify | `tests\TwitchHeists.Tests\BridgeActionsTests.cs` | Verify bridge-level success messages for bulk add/remove |
-| Modify | `.github\docs\streamerbot-install-guide.md` | Document `all` for mod add/remove and note that it targets active presence |
-| Modify | `README.md` | Mention bulk moderator adjustments for active viewers |
+| Create | `src\TwitchHeists.StreamerBot\Configuration\heist-messages.json` | Default editable heist conversation templates copied into the deployment output. |
+| Create | `src\TwitchHeists.StreamerBot\Configuration\HeistMessageTemplates.cs` | Strongly typed models for start, reminder, cooldown, success, and failure template groups. |
+| Create | `src\TwitchHeists.StreamerBot\Services\HeistMessageTemplateLoader.cs` | Load `heist-messages.json`, validate shape, and fall back to defaults when the file is missing or blank. |
+| Create | `src\TwitchHeists.StreamerBot\Services\HeistMessageComposer.cs` | Build final chat lines from templates and runtime data such as usernames, pot, winners, losers, and countdown text. |
+| Modify | `src\TwitchHeists.StreamerBot\Services\StartHeistAction.cs` | Replace hard-coded start and cooldown text with template-driven messages. |
+| Modify | `src\TwitchHeists.StreamerBot\Services\ResolveDueHeistsAction.cs` | Replace hard-coded reminder and result text with template-driven messages and structured flavor callouts. |
+| Modify | `src\TwitchHeists.StreamerBot\Composition\ActionRuntimeFactory.cs` | Load the template file and inject the composer into the heist actions. |
+| Modify | `src\TwitchHeists.StreamerBot\TwitchHeists.StreamerBot.csproj` | Copy `heist-messages.json` into the action-layer output. |
+| Modify | `src\TwitchHeists.StreamerBot.Bridge\Services\BridgeRuntimeFactory.cs` | Resolve the install-folder path for `heist-messages.json` alongside `appsettings.json`. |
+| Modify | `src\TwitchHeists.StreamerBot.Bridge\TwitchHeists.StreamerBot.Bridge.csproj` | Link and copy `heist-messages.json` into the bridge deployment output. |
+| Modify | `tests\TwitchHeists.Tests\HeistActionsTests.cs` | Add TDD coverage for template-driven start, reminder, cooldown, and result output. |
+| Modify | `tests\TwitchHeists.Tests\BridgeActionsTests.cs` | Verify the bridge loads shipped templates from the install folder and returns the new messages. |
+| Modify | `README.md` | Document that heist chat wording now lives in `heist-messages.json`. |
+| Modify | `.github\docs\streamerbot-install-guide.md` | Document where to place `heist-messages.json`, how to edit it, and that changes do not require rebuilding. |
 
 ## Tasks
 
-### Task 1: Add active-viewer bulk repository operations
+### Task 1: Define the editable heist message asset
 
 **Files:**
-- Modify: `src\TwitchHeists.Data.Sqlite\Repositories\ViewerRepository.cs`
+- Create: `src\TwitchHeists.StreamerBot\Configuration\heist-messages.json`
+- Create: `src\TwitchHeists.StreamerBot\Configuration\HeistMessageTemplates.cs`
+- Modify: `src\TwitchHeists.StreamerBot\TwitchHeists.StreamerBot.csproj`
+- Modify: `src\TwitchHeists.StreamerBot.Bridge\TwitchHeists.StreamerBot.Bridge.csproj`
 
-- [ ] **Step 1: Add active-viewer lookup**
-Create a repository method that returns the active viewer usernames from `viewer_presence` where `is_active = 1`. Return the normalized usernames already stored in the table so balance updates land on the same rows used by watchtime rewards.
+- [ ] **Step 1: Create the default JSON template file**
+Write `src\TwitchHeists.StreamerBot\Configuration\heist-messages.json` with grouped arrays for each chat surface:
+```json
+{
+  "startMessages": [
+    "{starter} started a heist with {stake} points. Starting in {joinWindow}.",
+    "{starter} is putting together a crew for {stake} points. The heist starts in {joinWindow}."
+  ],
+  "cooldownMessages": [
+    "The crew is laying low. A new heist can start in {cooldownRemaining}.",
+    "The heat is still on. Try another heist in {cooldownRemaining}."
+  ],
+  "reminderMessages": [
+    "Heist starts in {countdown}. Pot is now {pot} points across {participantCount} viewers.",
+    "{participantCount} crew members are ready. The heist starts in {countdown} with {pot} points on the line."
+  ],
+  "successHeadlines": [
+    "The crew cracked the vault and got away clean.",
+    "The crew blasted through the alarms and escaped with the haul."
+  ],
+  "failureHeadlines": [
+    "Police captured the whole crew before anyone escaped.",
+    "The crew got boxed in and everyone was gunned down."
+  ],
+  "successCallouts": [
+    "{winner} slipped out with {payout} points.",
+    "{winner} dove into the van with {payout} points."
+  ],
+  "failureCallouts": [
+    "{loser} got left behind in the crossfire.",
+    "{loser} took a bullet covering the escape."
+  ],
+  "sacrificeCallouts": [
+    "{loser} took a bullet for {winner}.",
+    "{loser} held the line so {winner} could escape."
+  ],
+  "resultSummaries": [
+    "{winnerCount} got out with {resolvedPot} points. Success chance was {successChancePercent}.",
+    "{loserCount} went down. Success chance was {successChancePercent}."
+  ]
+}
+```
 
-- [ ] **Step 2: Add bulk add operation**
-Create a repository method that accepts a sequence of normalized usernames, a positive amount, and a timestamp, then applies the same point addition to every user inside one SQLite transaction. Create missing `viewer_balances` rows as needed and return the count of updated viewers.
+- [ ] **Step 2: Add typed template models**
+Create `HeistMessageTemplates.cs` with one root type and array-backed properties for each group above so deserialization stays explicit and tests can construct templates in memory without reading the file system.
 
-- [ ] **Step 3: Add bulk remove operation**
-Create a repository method that accepts a sequence of normalized usernames, a positive amount, and a timestamp, then subtracts the amount from each target inside one SQLite transaction. Clamp each viewer balance at `0` and return the count of updated viewers.
+- [ ] **Step 3: Ship the template file with the build output**
+Add `<None Include="Configuration\heist-messages.json">` to `src\TwitchHeists.StreamerBot\TwitchHeists.StreamerBot.csproj` and a linked copy entry in `src\TwitchHeists.StreamerBot.Bridge\TwitchHeists.StreamerBot.Bridge.csproj`, matching the existing `appsettings.json` deployment pattern.
 
-- [ ] **Step 4: Verify the repository surface**
-Run: `dotnet build .\TwitchHeists.sln`
-Expected: the solution builds with the new repository APIs available for the action layer.
-
-### Task 2: Write failing tests for `all`
+### Task 2: Load templates from the install folder
 
 **Files:**
-- Modify: `tests\TwitchHeists.Tests\PointsActionsTests.cs`
+- Create: `src\TwitchHeists.StreamerBot\Services\HeistMessageTemplateLoader.cs`
+- Modify: `src\TwitchHeists.StreamerBot\Composition\ActionRuntimeFactory.cs`
+- Modify: `src\TwitchHeists.StreamerBot.Bridge\Services\BridgeRuntimeFactory.cs`
+
+- [ ] **Step 1: Implement a loader with default fallback**
+Create `HeistMessageTemplateLoader.cs` with a method that:
+1. reads `heist-messages.json` when the file exists,
+2. deserializes to `HeistMessageTemplates`,
+3. treats missing or empty arrays as invalid for that group,
+4. falls back to an in-memory default template set when the file is missing.
+
+- [ ] **Step 2: Resolve the template file path from the bridge**
+Update `BridgeRuntimeFactory` so the install directory resolves both `appsettings.json` and `heist-messages.json`, then pass the template path into `ActionRuntimeFactory.CreateStartHeistAction(...)` and `CreateResolveDueHeistsAction(...)`.
+
+- [ ] **Step 3: Inject templates into the action runtime**
+Update `ActionRuntimeFactory` to construct one `HeistMessageComposer` per action using the loaded templates, while keeping the existing `HeistSettings` and repository wiring unchanged.
+
+### Task 3: Add failing tests for template-driven heist chat
+
+**Files:**
+- Modify: `tests\TwitchHeists.Tests\HeistActionsTests.cs`
 - Modify: `tests\TwitchHeists.Tests\BridgeActionsTests.cs`
 
-- [ ] **Step 1: Add action-level bulk tests**
-Write failing tests for:
-1. `AddPointsAction` adding points to every active viewer when `TargetUsername = "all"`;
-2. `RemovePointsAction` subtracting from every active viewer and clamping each balance at zero;
-3. `AddPointsAction` returning a bulk summary message for `all` that does **not** include `"Balance is now"`;
-4. `RemovePointsAction` returning a bulk summary message for `all` that does **not** include `"Balance is now"`;
-5. `AddPointsAction` returning a friendly failure when `all` is used but there are no active viewers;
-6. `RemovePointsAction` returning a friendly failure when `all` is used but there are no active viewers.
+- [ ] **Step 1: Add start and cooldown message tests**
+Add tests that create a custom template set in memory and expect `StartHeistAction` to emit the selected start string and the selected cooldown string instead of the current hard-coded wording.
 
-- [ ] **Step 2: Preserve single-target coverage**
-Keep one existing single-target add test and one existing single-target remove test green so the new `all` branch does not replace the normal per-user behavior.
+- [ ] **Step 2: Add reminder and result message tests**
+Add tests that expect `ResolveDueHeistsAction` to:
+1. use the reminder template text at 1 minute, 30 seconds, and 10 seconds,
+2. use a success headline plus success callouts plus summary when the heist succeeds,
+3. use a failure headline plus failure callouts plus summary when the heist fails.
 
-- [ ] **Step 3: Add bridge-level bulk tests**
-Write failing bridge tests for:
-1. `AddPoints` with target `all` returning a success message that names the active-viewer count;
-2. `RemovePoints` with target `all` returning a success message that names the active-viewer count.
+- [ ] **Step 3: Add bridge file-loading tests**
+Write bridge tests that place a custom `heist-messages.json` inside the temporary install directory and verify `BridgeActions.StartHeist(...)` and `BridgeActions.ResolveDueHeists(...)` return text from that file.
 
-- [ ] **Step 4: Run the focused test filter**
-Run: `dotnet test .\tests\TwitchHeists.Tests\TwitchHeists.Tests.csproj --filter "Points|Bridge"`
-Expected: the new bulk tests fail because the action and repository layers do not handle `all` yet.
+- [ ] **Step 4: Confirm the tests fail first**
+Run: `dotnet test .\tests\TwitchHeists.Tests\TwitchHeists.Tests.csproj --filter "Heist|Bridge"`
+Expected: failures showing the actions still use hard-coded messages and do not yet load the custom template file.
 
-### Task 3: Implement `all` in the StreamerBot points actions
+### Task 4: Implement the heist message composer
 
 **Files:**
-- Modify: `src\TwitchHeists.StreamerBot\Services\AddPointsAction.cs`
-- Modify: `src\TwitchHeists.StreamerBot\Services\RemovePointsAction.cs`
+- Create: `src\TwitchHeists.StreamerBot\Services\HeistMessageComposer.cs`
+- Modify: `src\TwitchHeists.StreamerBot\Services\StartHeistAction.cs`
+- Modify: `src\TwitchHeists.StreamerBot\Services\ResolveDueHeistsAction.cs`
 
-- [ ] **Step 1: Implement bulk add branch**
-In `AddPointsAction`, detect `TargetUsername` equal to `all` after normalization. Load the active normalized usernames from the repository, fail with a friendly message if the list is empty, call the new bulk add repository method, and return a summary such as `"18 active viewers each received 500 points."` Do not include any `"Balance is now X"` wording in the bulk response.
+- [ ] **Step 1: Build placeholder replacement**
+Implement `HeistMessageComposer` so it replaces placeholders such as `{starter}`, `{stake}`, `{joinWindow}`, `{cooldownRemaining}`, `{countdown}`, `{pot}`, `{participantCount}`, `{winner}`, `{loser}`, `{winnerCount}`, `{loserCount}`, `{resolvedPot}`, and `{successChancePercent}`.
 
-- [ ] **Step 2: Implement bulk remove branch**
-In `RemovePointsAction`, detect `TargetUsername` equal to `all` after normalization. Load the active normalized usernames from the repository, fail with a friendly message if the list is empty, call the new bulk remove repository method, and return a summary such as `"18 active viewers each lost 500 points."` Do not include any `"Balance is now X"` wording in the bulk response.
+- [ ] **Step 2: Randomize within a template group safely**
+Have the composer choose one string from each relevant array. Keep the random selection inside the composer so the actions remain deterministic in tests by allowing a controllable selector or random delegate.
 
-- [ ] **Step 3: Preserve single-target behavior**
-Keep the existing single-target path unchanged for any target other than `all`, including the current success wording and per-user balance lookup.
+- [ ] **Step 3: Switch start and cooldown messaging**
+Update `StartHeistAction` to ask the composer for:
+1. a start message after the round is created,
+2. a cooldown message when `GetActiveCooldownEndsAtUtc(...)` blocks a new heist.
 
-- [ ] **Step 4: Run the focused action test filter**
-Run: `dotnet test .\tests\TwitchHeists.Tests\TwitchHeists.Tests.csproj --filter "PointsActions"`
-Expected: bulk and single-target action tests pass.
+- [ ] **Step 4: Switch reminder and result messaging**
+Update `ResolveDueHeistsAction` to ask the composer for:
+1. the countdown reminder text,
+2. the final success or failure message built as one headline, up to two callouts, and one short summary.
 
-### Task 4: Verify bridge behavior for `all`
+- [ ] **Step 5: Keep flavor structured and bounded**
+Cap final output to a chat-friendly structure:
+1. exactly one headline,
+2. zero to two callouts depending on available winners and losers,
+3. exactly one summary sentence.
+This keeps the message readable even when many viewers join.
+
+- [ ] **Step 6: Re-run focused tests**
+Run: `dotnet test .\tests\TwitchHeists.Tests\TwitchHeists.Tests.csproj --filter "Heist|Bridge"`
+Expected: all focused heist and bridge tests pass with custom-template coverage.
+
+### Task 5: Document the external message file
 
 **Files:**
-- Modify: `tests\TwitchHeists.Tests\BridgeActionsTests.cs`
-
-- [ ] **Step 1: Re-run the bridge filter**
-Run: `dotnet test .\tests\TwitchHeists.Tests\TwitchHeists.Tests.csproj --filter "BridgeActionsTests"`
-Expected: bridge tests pass without changing the bridge DTO or method signatures.
-
-- [ ] **Step 2: Confirm command contract stability**
-Review `src\TwitchHeists.StreamerBot.Bridge\Services\BridgeActions.cs` and confirm no code changes are needed because the bridge should pass the literal target string `all` through the existing `BridgePointsCommand`.
-
-### Task 5: Update the Streamer.bot guide
-
-**Files:**
-- Modify: `.github\docs\streamerbot-install-guide.md`
 - Modify: `README.md`
+- Modify: `.github\docs\streamerbot-install-guide.md`
 
-- [ ] **Step 1: Document `all` behavior**
-Add a note that `!points add all <amount>` and `!points remove all <amount>` target every viewer currently active in TwitchHeists presence tracking. State clearly that `!points give all` is not supported.
+- [ ] **Step 1: Document the new deployment artifact**
+Update both docs to state that the release output now includes `heist-messages.json` and that Streamer.bot users must keep it beside `TwitchHeists.StreamerBot.Bridge.dll` and `appsettings.json`.
 
-- [ ] **Step 2: Update the points command snippets**
-In the full standalone `CPHInline` examples for add/remove, note that the target lookup sub-action should be skipped when the literal target is `all`, because there is no Twitch user to resolve in that case.
+- [ ] **Step 2: Document how to customize without rebuilding**
+Add a short example showing that users can add, remove, or edit message strings in `heist-messages.json`, then save the file and let the next action run pick up the new text.
 
-- [ ] **Step 3: Update the README capability summary**
-Mention bulk moderator adjustments for currently active viewers alongside the existing points command summary.
+- [ ] **Step 3: Document supported placeholders**
+List the supported placeholder names for each message group so users know which tokens are safe to edit.
 
-### Task 6: Run final verification
+### Task 6: Full verification
 
 **Files:**
-- Modify docs or action messages if verification finds mismatches
+- Modify: none
 
-- [ ] **Step 1: Run the full test suite**
+- [ ] **Step 1: Run the full solution tests**
 Run: `dotnet test .\TwitchHeists.sln`
-Expected: all tests pass, including new bulk add/remove coverage.
+Expected: all tests passing, zero failures.
 
-- [ ] **Step 2: Build release output**
+- [ ] **Step 2: Run the release build**
 Run: `dotnet build .\TwitchHeists.sln -c Release`
-Expected: the solution builds successfully and the bridge release output remains deployable.
+Expected: build succeeds for all projects and the bridge output contains `heist-messages.json`.
 
-- [ ] **Step 3: Confirm docs match runtime behavior**
-Review `.github\docs\streamerbot-install-guide.md` against the implemented `AddPointsAction` and `RemovePointsAction` behavior to confirm the guide accurately describes active-viewer targeting, unsupported `give all`, and when to skip target lookup.
+- [ ] **Step 3: Record the rollout note**
+Note that Streamer.bot deployments must copy the updated `net48` bridge output folder so the new JSON template file is present beside the DLLs.
 
 ## Notes
 
-- Treat active viewers as whatever `ViewerRepository.GetActivePresence()` returns at command time. This includes chat fallback presence that has not expired yet and community-confirmed presence.
-- Keep `all` support limited to `!points add` and `!points remove`; do not add bulk `give`.
-- If `all` is used with no active viewers, return a friendly failure message instead of silently succeeding.
-- Bulk `all` responses should stay aggregate-only; they must not include a single balance line such as `"Balance is now X"`.
-- Use the existing normalized username rules so bulk updates hit the same balance rows as single-target commands and watchtime rewards.
+- Keep the conversation-template feature in `TwitchHeists.StreamerBot` and `TwitchHeists.StreamerBot.Bridge`; do not move it into `TwitchHeists.Core` because it is chat-presentation behavior.
+- Prefer a dedicated `heist-messages.json` file over adding large template arrays to `appsettings.json` so users can manage message text separately from timing and numeric heist settings.
+- The composer should still work when a heist has only one participant, no winners, or no losers by choosing only the callout groups that have valid data for that outcome.

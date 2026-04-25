@@ -30,6 +30,7 @@ Your folder should look roughly like this:
 D:\Streamer Bot\Extensions\TwitchHeist\
   appsettings.json
   bridge-readme.txt
+  heist-messages.json
   Microsoft.Bcl.AsyncInterfaces.dll
   Microsoft.Data.Sqlite.dll
   SQLitePCLRaw.batteries_v2.dll
@@ -75,10 +76,51 @@ You can also tune these values before first use:
 | `Rewards.Tier2Multiplier` | `2.0` | Tier 2 subscriber multiplier |
 | `Rewards.Tier3Multiplier` | `3.0` | Tier 3 subscriber multiplier |
 | `Heist.JoinWindow` | `00:02:00` | How long a heist stays open |
+| `Heist.CooldownWindow` | `00:05:00` | Time after results before another heist can start |
+| `Heist.OneMinuteReminderThreshold` | `00:01:00` | When to send the 1-minute countdown reminder |
+| `Heist.ThirtySecondReminderThreshold` | `00:00:30` | When to send the 30-second countdown reminder |
+| `Heist.TenSecondReminderThreshold` | `00:00:10` | When to send the 10-second countdown reminder |
 | `Heist.MinimumSuccessChance` | `0.4` | Lowest allowed success chance |
 | `Heist.MaximumSuccessChance` | `0.75` | Highest allowed success chance |
 | `Heist.MaximumWinnerCount` | `5` | Maximum winners on a successful heist |
 | `Heist.SuccessfulPotMultiplier` | `2.0` | Pot multiplier on success |
+
+`heist-messages.json` sits beside `appsettings.json` in the same install folder and controls all heist chat output without rebuilding the project.
+
+Supported message groups:
+
+| Group | Used for |
+|---|---|
+| `startMessages` | `!heist` success text |
+| `cooldownMessages` | `!heist` rejection while cooldown is active |
+| `reminderMessages` | 1-minute, 30-second, and 10-second countdown messages |
+| `successHeadlines` | Opening line for a successful resolved heist |
+| `failureHeadlines` | Opening line for a failed resolved heist |
+| `successCallouts` | Winner-focused follow-up lines |
+| `failureCallouts` | Loser-focused follow-up lines |
+| `sacrificeCallouts` | Mixed winner/loser lines on successful heists with casualties |
+| `resultSummaries` | Final summary sentence with totals and success chance |
+
+Supported placeholders:
+
+| Placeholder | Meaning |
+|---|---|
+| `{starter}` | Username that started the heist |
+| `{stake}` | Start amount entered on `!heist` |
+| `{joinWindow}` | Human-readable open window such as `2 minutes` |
+| `{cooldownRemaining}` | Remaining cooldown such as `2m 0s` |
+| `{countdown}` | Reminder text such as `1 minute` or `10 seconds` |
+| `{pot}` | Current open pot before resolution |
+| `{participantCount}` | Number of joined viewers |
+| `{winner}` | Winner username for a callout |
+| `{loser}` | Loser username for a callout |
+| `{payout}` | Winner payout amount |
+| `{winnerCount}` | Number of winners |
+| `{loserCount}` | Number of losers |
+| `{resolvedPot}` | Final resolved pot |
+| `{successChancePercent}` | Final success chance like `68.58%` |
+
+Edit the arrays in `heist-messages.json`, save the file, and the next heist action run will use the new wording. You do not need to rebuild the DLLs just to change chat lines.
 
 ## 4. Keep Streamer.bot references minimal
 
@@ -105,6 +147,7 @@ The snippets below use real Streamer.bot args instead of placeholder usernames:
 2. command amounts come from `input0`, `input1`, and so on;
 3. target lookups should use a **Twitch -> User -> Get User Info for Target** sub-action before the Execute C# step, with **User Login** set to the actual target slot (`%input0%` for a dedicated `!points add` command, or `%input1%` if you use one shared `!points` command and the first token is `add/remove/give`). That gives you `targetUserName`, `targetUser`, and `targetUserId`.
 4. subscriber multipliers only work if the chat/community snippets pass a real subscriber tier into the bridge. Leaving `SubscriberTier` hardcoded to `0` makes everyone look unsubscribed.
+5. the sample `CPH.LogInfo(...)` calls use `[TwitchHeists][Area]` prefixes so you can filter Streamer.bot logs down to this project while debugging.
 
 In every snippet below:
 
@@ -152,7 +195,7 @@ public class CPHInline
         var result = InvokeBridge(bridgeActions, "RefreshCommunityViewers", InstallDir, DateTimeOffset.UtcNow, snapshot);
         var message = GetStringProperty(result, "Message");
 
-        CPH.LogInfo(message);
+        CPH.LogInfo("[TwitchHeists][CommunityRefresh] " + message);
         return true;
     }
 
@@ -356,7 +399,7 @@ public class CPHInline
         var result = InvokeBridge(bridgeActions, "RecordChatPresence", InstallDir, presence, nextRefreshBoundaryUtc);
         var message = GetStringProperty(result, "Message");
 
-        CPH.LogInfo(message);
+        CPH.LogInfo("[TwitchHeists][ChatPresence] " + message);
         return true;
     }
 
@@ -559,6 +602,8 @@ Run this when chat matches `!heist <amount>`.
 
 This action should usually send the result back to chat.
 
+Successful starts now return a message from `heist-messages.json`, using placeholders like `{starter}`, `{stake}`, and `{joinWindow}`. If the previous round already finished and the 5-minute cooldown is still active, the action returns a `cooldownMessages` entry with `{cooldownRemaining}` filled in instead.
+
 Use the same helper members from **Action 2** so the chatter username and Twitch user ID come straight from Streamer.bot.
 
 ```csharp
@@ -595,7 +640,7 @@ public class CPHInline
             CPH.SendMessage(message);
         }
 
-        CPH.LogInfo(message);
+        CPH.LogInfo("[TwitchHeists][HeistStart] " + message);
         return true;
     }
 
@@ -757,7 +802,7 @@ public class CPHInline
             CPH.SendMessage(message);
         }
 
-        CPH.LogInfo(message);
+        CPH.LogInfo("[TwitchHeists][HeistJoin] " + message);
         return true;
     }
 
@@ -823,6 +868,57 @@ public class CPHInline
         var value = target.GetType().GetProperty(propertyName).GetValue(target, null);
         return value == null ? string.Empty : value.ToString();
     }
+
+    private string GetSenderUsername()
+    {
+        return GetRequiredStringArg("userName", "user");
+    }
+
+    private string GetSenderDisplayName(string fallbackUsername)
+    {
+        return GetOptionalStringArg("displayName", "user") ?? fallbackUsername;
+    }
+
+    private string? GetSenderUserId()
+    {
+        return GetOptionalStringArg("userId");
+    }
+
+    private decimal GetRequiredDecimalArg(params string[] argNames)
+    {
+        var rawValue = GetRequiredStringArg(argNames);
+        if (decimal.TryParse(rawValue, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsedAmount))
+        {
+            return parsedAmount;
+        }
+
+        if (decimal.TryParse(rawValue, NumberStyles.Number, CultureInfo.CurrentCulture, out parsedAmount))
+        {
+            return parsedAmount;
+        }
+
+        throw new InvalidOperationException($"'{rawValue}' is not a valid amount.");
+    }
+
+    private string GetRequiredStringArg(params string[] argNames)
+    {
+        return GetOptionalStringArg(argNames)
+            ?? throw new InvalidOperationException(
+                $"Missing required Streamer.bot argument. Tried: {string.Join(", ", argNames)}.");
+    }
+
+    private string? GetOptionalStringArg(params string[] argNames)
+    {
+        foreach (var argName in argNames)
+        {
+            if (CPH.TryGetArg<string>(argName, out var value) && !string.IsNullOrWhiteSpace(value))
+            {
+                return value.Trim();
+            }
+        }
+
+        return null;
+    }
 }
 ```
 
@@ -830,7 +926,14 @@ public class CPHInline
 
 Run this on a short timer such as every **10 to 30 seconds**.
 
-If you want the resolved outcome announced in chat, send the returned message here too.
+This timer action now handles all post-start heist chat output:
+
+1. the **1-minute** reminder;
+2. the **30-second** reminder;
+3. the **10-second** reminder;
+4. the final result message.
+
+If you want those reminders and the resolved outcome announced in chat, send the returned message here too and keep this timer running continuously. The wording comes from `heist-messages.json`, so you can tune the flavor later without changing the code.
 
 ```csharp
 using System;
@@ -855,7 +958,7 @@ public class CPHInline
             CPH.SendMessage(message);
         }
 
-        CPH.LogInfo(message);
+        CPH.LogInfo("[TwitchHeists][HeistResolve] " + message);
         return true;
     }
 
@@ -959,7 +1062,7 @@ public bool Execute()
         CPH.SendMessage(message);
     }
 
-    CPH.LogInfo(message);
+    CPH.LogInfo("[TwitchHeists][PointsAdd] " + message);
     return true;
 }
 
@@ -1157,7 +1260,7 @@ public bool Execute()
         CPH.SendMessage(message);
     }
 
-    CPH.LogInfo(message);
+    CPH.LogInfo("[TwitchHeists][PointsRemove] " + message);
     return true;
 }
 
@@ -1359,7 +1462,7 @@ public bool Execute()
         CPH.SendMessage(message);
     }
 
-    CPH.LogInfo(message);
+    CPH.LogInfo("[TwitchHeists][PointsGive] " + message);
     return true;
 }
 
@@ -1575,7 +1678,7 @@ public bool Execute()
         CPH.SendMessage(message);
     }
 
-    CPH.LogInfo(message);
+    CPH.LogInfo("[TwitchHeists][Watchtime] " + message);
     return true;
 }
 
@@ -1707,7 +1810,7 @@ The reflection loader still returns the bridge result object at runtime. The sni
 
 1. The full contents of `src\TwitchHeists.StreamerBot.Bridge\bin\Release\net48\` were copied into one folder.
 2. No `TwitchHeists.*.dll` files are manually added in Streamer.bot action references.
-3. `appsettings.json` is beside the bridge DLL.
+3. `appsettings.json` and `heist-messages.json` are beside the bridge DLL.
 4. You copied the `runtimes\` folder too.
 5. Every Streamer.bot action uses the same `installDir`.
 6. Your Community refresh action runs every 5 minutes.
