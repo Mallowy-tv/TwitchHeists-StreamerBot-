@@ -82,10 +82,15 @@ You can also tune these values before first use:
 | `Heist.TenSecondReminderThreshold` | `00:00:10` | When to send the 10-second countdown reminder |
 | `Heist.MinimumSuccessChance` | `0.4` | Lowest allowed success chance |
 | `Heist.MaximumSuccessChance` | `0.75` | Highest allowed success chance |
-| `Heist.MaximumWinnerCount` | `5` | Maximum winners on a successful heist |
+| `Heist.MinimumPlayers` | `2` | Minimum joined crew size before a heist can resolve normally |
+| `Heist.WinnerBands` | built-in defaults | Adaptive winner ranges keyed by joined player count |
+| `Heist.MaximumNamedResolutionCallouts` | `2` | Max named callouts before the result falls back to summary-only text |
+| `Heist.MaximumWinnerCount` | `5` | Fallback cap only if no winner band applies |
 | `Heist.SuccessfulPotMultiplier` | `2.0` | Pot multiplier on success |
 
 `heist-messages.json` sits beside `appsettings.json` in the same install folder and controls all heist chat output without rebuilding the project.
+
+By default, crews below `Heist.MinimumPlayers` resolve through the insufficient-crew path and get their reserved stakes refunded. Larger crews use the built-in adaptive winner bands instead of a fixed winner count.
 
 Supported message groups:
 
@@ -94,6 +99,7 @@ Supported message groups:
 | `startMessages` | `!heist` success text |
 | `cooldownMessages` | `!heist` rejection while cooldown is active |
 | `reminderMessages` | 1-minute, 30-second, and 10-second countdown messages |
+| `insufficientCrewMessages` | Result text when the crew is too small and everyone is refunded |
 | `successHeadlines` | Opening line for a successful resolved heist |
 | `failureHeadlines` | Opening line for a failed resolved heist |
 | `successCallouts` | Winner-focused follow-up lines |
@@ -121,6 +127,8 @@ Supported placeholders:
 | `{successChancePercent}` | Final success chance like `68.58%` |
 
 Edit the arrays in `heist-messages.json`, save the file, and the next heist action run will use the new wording. You do not need to rebuild the DLLs just to change chat lines.
+
+For large crews, TwitchHeists intentionally keeps the final result compact: headline, a small number of named callouts, then the summary. If you want even shorter results, lower `Heist.MaximumNamedResolutionCallouts`.
 
 ## 4. Keep Streamer.bot references minimal
 
@@ -934,7 +942,7 @@ This timer action now handles all post-start heist chat output:
 3. the **10-second** reminder;
 4. the final result message.
 
-If you want those reminders and the resolved outcome announced in chat, send the returned message here too and keep this timer running continuously. The wording comes from `heist-messages.json`, so you can tune the flavor later without changing the code.
+If you want those reminders and the resolved outcome announced in chat, send the returned message here too and keep this timer running continuously. The wording comes from `heist-messages.json`, so you can tune the flavor later without changing the code. That same timer now covers insufficient-crew refunds as well as normal win/loss resolutions.
 
 ```csharp
 using System;
@@ -2067,7 +2075,9 @@ Watch streaks are silent. They do not send chat output when a viewer qualifies. 
 2. Chat-only presence expires at the next refresh boundary if the viewer never appears in the Community snapshot.
 3. Heist points are reserved when a user starts or joins a round.
 4. On failure, reserved points stay lost.
-5. On success, the pot is doubled and split across up to the configured winner cap.
-6. `!points remove` clamps the target balance to zero instead of allowing negative balances.
-7. `!points give` fails when the sender does not have enough points.
-8. `!watchtime` returns lifetime rewarded watch minutes, not just the current stream session.
+5. Crews below `Heist.MinimumPlayers` are refunded instead of being forced into a normal resolution.
+6. On success, the pot is doubled and split across an adaptive winner count from the configured winner bands.
+7. Large heist result messages stay compact and respect `Heist.MaximumNamedResolutionCallouts`.
+8. `!points remove` clamps the target balance to zero instead of allowing negative balances.
+9. `!points give` fails when the sender does not have enough points.
+10. `!watchtime` returns lifetime rewarded watch minutes, not just the current stream session.

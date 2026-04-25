@@ -19,5 +19,7 @@ public sealed class HeistResolutionResult
 
     public IReadOnlyList<HeistParticipant> Losers { get; set; } = Array.Empty<HeistParticipant>();
 
+    public IReadOnlyList<HeistParticipant> RefundedParticipants { get; set; } = Array.Empty<HeistParticipant>();
+
     public DateTimeOffset ResolvedAtUtc { get; set; }
 }

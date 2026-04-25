@@ -270,7 +270,7 @@ public sealed class BridgeActionsTests : IDisposable
     public void StartHeist_UsesCustomTemplateFileForCooldownMessage()
     {
         EnsureInstallDirectory(
-            configurationJson: BuildHeistConfigurationJson(1.0m, 1.0m),
+            configurationJson: BuildHeistConfigurationJson(1.0m, 1.0m, minimumPlayers: 1),
             messageTemplatesJson:
             """
             {
@@ -422,7 +422,7 @@ public sealed class BridgeActionsTests : IDisposable
     public void ResolveDueHeists_UsesCustomTemplateFileForSuccessResult()
     {
         EnsureInstallDirectory(
-            configurationJson: BuildHeistConfigurationJson(1.0m, 1.0m),
+            configurationJson: BuildHeistConfigurationJson(1.0m, 1.0m, minimumPlayers: 1),
             messageTemplatesJson:
             """
             {
@@ -479,7 +479,7 @@ public sealed class BridgeActionsTests : IDisposable
     public void ResolveDueHeists_UsesCustomTemplateFileForFailureResult()
     {
         EnsureInstallDirectory(
-            configurationJson: BuildHeistConfigurationJson(0.0m, 0.0m),
+            configurationJson: BuildHeistConfigurationJson(0.0m, 0.0m, minimumPlayers: 1),
             messageTemplatesJson:
             """
             {
@@ -530,6 +530,158 @@ public sealed class BridgeActionsTests : IDisposable
 
         Assert.True(result.Success);
         Assert.Equal("CUSTOM FAILURE HEADLINE CUSTOM LOSER starter CUSTOM SUMMARY 0 1 100 0%", result.Message);
+    }
+
+    [Fact]
+    public void ResolveDueHeists_UsesCustomTemplateFileForInsufficientCrewResultsAndLoadsMinimumPlayers()
+    {
+        EnsureInstallDirectory(
+            configurationJson: BuildHeistConfigurationJson(1.0m, 1.0m, minimumPlayers: 3),
+            messageTemplatesJson:
+            """
+            {
+              "startMessages": [
+                "CUSTOM START {starter} {stake} {joinWindow}"
+              ],
+              "cooldownMessages": [
+                "CUSTOM COOLDOWN {cooldownRemaining}"
+              ],
+              "reminderMessages": [
+                "CUSTOM REMINDER {countdown} {pot} {participantCount}"
+              ],
+              "successHeadlines": [
+                "CUSTOM SUCCESS HEADLINE"
+              ],
+              "failureHeadlines": [
+                "CUSTOM FAILURE HEADLINE"
+              ],
+              "successCallouts": [
+                "CUSTOM WINNER {winner} {payout}"
+              ],
+              "failureCallouts": [
+                "CUSTOM LOSER {loser}"
+              ],
+              "sacrificeCallouts": [
+                "CUSTOM SACRIFICE {loser} {winner}"
+              ],
+              "resultSummaries": [
+                "CUSTOM SUMMARY {winnerCount} {loserCount} {resolvedPot} {successChancePercent}"
+              ],
+              "insufficientCrewMessages": [
+                "CUSTOM INSUFFICIENT {participantCount} {resolvedPot}"
+              ]
+            }
+            """);
+        SeedBalance("starter", 500m, 0);
+        SeedBalance("backup", 500m, 0);
+        var actions = new BridgeActions();
+        var startedAt = new DateTimeOffset(2026, 4, 25, 16, 0, 0, TimeSpan.Zero);
+
+        actions.StartHeist(
+            installDirectory,
+            new BridgeHeistCommand
+            {
+                Username = "starter",
+                DisplayName = "Starter",
+                StakeAmount = 100m,
+                OccurredAtUtc = startedAt
+            });
+        var joinResult = actions.JoinHeist(
+            installDirectory,
+            new BridgeHeistCommand
+            {
+                Username = "backup",
+                DisplayName = "Backup",
+                StakeAmount = 100m,
+                OccurredAtUtc = startedAt.AddSeconds(10)
+            });
+
+        Assert.True(joinResult.Success);
+
+        var result = actions.ResolveDueHeists(installDirectory, startedAt.AddMinutes(2));
+
+        Assert.True(result.Success);
+        Assert.Equal("CUSTOM INSUFFICIENT 2 200", result.Message);
+    }
+
+    [Fact]
+    public void ResolveDueHeists_UsesConfiguredMaximumNamedCalloutsForLargeCrews()
+    {
+        EnsureInstallDirectory(
+            configurationJson: BuildHeistConfigurationJson(1.0m, 1.0m, minimumPlayers: 2, maximumNamedResolutionCallouts: 1),
+            messageTemplatesJson:
+            """
+            {
+              "startMessages": [
+                "CUSTOM START {starter} {stake} {joinWindow}"
+              ],
+              "cooldownMessages": [
+                "CUSTOM COOLDOWN {cooldownRemaining}"
+              ],
+              "reminderMessages": [
+                "CUSTOM REMINDER {countdown} {pot} {participantCount}"
+              ],
+              "successHeadlines": [
+                "CUSTOM SUCCESS HEADLINE"
+              ],
+              "failureHeadlines": [
+                "CUSTOM FAILURE HEADLINE"
+              ],
+              "successCallouts": [
+                "CUSTOM CALLOUT {winner} {payout}"
+              ],
+              "failureCallouts": [
+                "CUSTOM LOSER {loser}"
+              ],
+              "sacrificeCallouts": [
+                "CUSTOM CALLOUT {loser} {winner}"
+              ],
+              "resultSummaries": [
+                "CUSTOM SUMMARY {winnerCount} {loserCount} {resolvedPot} {successChancePercent}"
+              ]
+            }
+            """);
+        SeedBalance("starter", 500m, 0);
+        SeedBalance("viewer2", 500m, 0);
+        SeedBalance("viewer3", 500m, 0);
+        SeedBalance("viewer4", 500m, 0);
+        SeedBalance("viewer5", 500m, 0);
+        SeedBalance("viewer6", 500m, 0);
+        var actions = new BridgeActions();
+        var startedAt = new DateTimeOffset(2026, 4, 25, 16, 0, 0, TimeSpan.Zero);
+
+        var startResult = actions.StartHeist(
+            installDirectory,
+            new BridgeHeistCommand
+            {
+                Username = "starter",
+                DisplayName = "Starter",
+                StakeAmount = 100m,
+                OccurredAtUtc = startedAt
+            });
+
+        Assert.True(startResult.Success);
+
+        foreach (var viewer in new[] { "viewer2", "viewer3", "viewer4", "viewer5", "viewer6" })
+        {
+            var joinResult = actions.JoinHeist(
+                installDirectory,
+                new BridgeHeistCommand
+                {
+                    Username = viewer,
+                    DisplayName = viewer,
+                    StakeAmount = 100m,
+                    OccurredAtUtc = startedAt.AddSeconds(15)
+                });
+
+            Assert.True(joinResult.Success);
+        }
+
+        var result = actions.ResolveDueHeists(installDirectory, startedAt.AddMinutes(2));
+
+        Assert.True(result.Success);
+        Assert.Equal(1, CountOccurrences(result.Message, "CUSTOM CALLOUT"));
+        Assert.Contains("CUSTOM SUMMARY", result.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -756,7 +908,11 @@ public sealed class BridgeActionsTests : IDisposable
         }
     }
 
-    private static string BuildHeistConfigurationJson(decimal minimumSuccessChance, decimal maximumSuccessChance)
+    private static string BuildHeistConfigurationJson(
+        decimal minimumSuccessChance,
+        decimal maximumSuccessChance,
+        int minimumPlayers = 2,
+        int maximumNamedResolutionCallouts = 2)
     {
         return
             $$"""
@@ -769,11 +925,31 @@ public sealed class BridgeActionsTests : IDisposable
                 "TenSecondReminderThreshold": "00:00:10",
                 "MinimumSuccessChance": {{minimumSuccessChance.ToString(CultureInfo.InvariantCulture)}},
                 "MaximumSuccessChance": {{maximumSuccessChance.ToString(CultureInfo.InvariantCulture)}},
+                "MinimumPlayers": {{minimumPlayers}},
                 "MaximumWinnerCount": 5,
+                "MaximumNamedResolutionCallouts": {{maximumNamedResolutionCallouts}},
                 "SuccessfulPotMultiplier": 2.0
               }
             }
             """;
+    }
+
+    private static int CountOccurrences(string value, string token)
+    {
+        var count = 0;
+        var startIndex = 0;
+
+        while (true)
+        {
+            var index = value.IndexOf(token, startIndex, StringComparison.Ordinal);
+            if (index < 0)
+            {
+                return count;
+            }
+
+            count++;
+            startIndex = index + token.Length;
+        }
     }
 
     private void SeedBalance(string normalizedUsername, decimal pointsBalance, int totalWatchMinutes)

@@ -6,5 +6,6 @@ public enum HeistRoundState
     Locked = 1,
     ResolvedSuccess = 2,
     ResolvedFailure = 3,
-    Cancelled = 4
+    Cancelled = 4,
+    InsufficientCrew = 5
 }

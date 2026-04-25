@@ -32,7 +32,8 @@ public sealed class HeistMessageTemplateLoader
                 SuccessCallouts = EnsureGroup(parsed.SuccessCallouts, defaults.SuccessCallouts),
                 FailureCallouts = EnsureGroup(parsed.FailureCallouts, defaults.FailureCallouts),
                 SacrificeCallouts = EnsureGroup(parsed.SacrificeCallouts, defaults.SacrificeCallouts),
-                ResultSummaries = EnsureGroup(parsed.ResultSummaries, defaults.ResultSummaries)
+                ResultSummaries = EnsureGroup(parsed.ResultSummaries, defaults.ResultSummaries),
+                InsufficientCrewMessages = EnsureGroup(parsed.InsufficientCrewMessages, defaults.InsufficientCrewMessages)
             };
         }
         catch (JsonException exception)

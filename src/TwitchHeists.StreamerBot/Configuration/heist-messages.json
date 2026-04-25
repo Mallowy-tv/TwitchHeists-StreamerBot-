@@ -35,5 +35,8 @@
   ],
   "resultSummaries": [
     "{winnerCount} got out with {resolvedPot} points while {loserCount} were left behind. Success chance was {successChancePercent}."
+  ],
+  "insufficientCrewMessages": [
+    "The crew was too small to leave the hideout. {participantCount} joined, so everyone got their {resolvedPot} points back."
   ]
 }

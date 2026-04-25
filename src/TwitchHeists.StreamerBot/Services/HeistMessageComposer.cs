@@ -1,5 +1,6 @@
 using System.Globalization;
 using TwitchHeists.Core.Models;
+using TwitchHeists.Core.Options;
 using TwitchHeists.StreamerBot.Configuration;
 
 namespace TwitchHeists.StreamerBot.Services;
@@ -8,11 +9,18 @@ public sealed class HeistMessageComposer
 {
     private static readonly Random DefaultRandom = new();
     private readonly HeistMessageTemplates templates;
+    private readonly HeistSettings heistSettings;
     private readonly Func<int, int> chooseIndex;
 
     public HeistMessageComposer(HeistMessageTemplates templates, Func<int, int>? chooseIndex = null)
+        : this(templates, new HeistSettings(), chooseIndex)
+    {
+    }
+
+    public HeistMessageComposer(HeistMessageTemplates templates, HeistSettings heistSettings, Func<int, int>? chooseIndex = null)
     {
         this.templates = templates;
+        this.heistSettings = heistSettings;
         this.chooseIndex = chooseIndex ?? DefaultRandom.Next;
     }
 
@@ -52,6 +60,16 @@ public sealed class HeistMessageComposer
 
     public string ComposeResolution(HeistResolutionResult resolution)
     {
+        if (resolution.FinalState == HeistRoundState.InsufficientCrew)
+        {
+            return ReplaceTokens(
+                SelectTemplate(templates.InsufficientCrewMessages),
+                BuildParticipantTokens(
+                    winner: null,
+                    loser: null,
+                    resolution));
+        }
+
         var parts = new List<string>();
         var isSuccess = resolution.FinalState == HeistRoundState.ResolvedSuccess;
         parts.Add(SelectTemplate(isSuccess ? templates.SuccessHeadlines : templates.FailureHeadlines));
@@ -63,9 +81,15 @@ public sealed class HeistMessageComposer
     private IEnumerable<string> BuildCallouts(HeistResolutionResult resolution, bool isSuccess)
     {
         var callouts = new List<string>();
+        var maximumNamedCallouts = Math.Max(0, heistSettings.MaximumNamedResolutionCallouts);
+        if (maximumNamedCallouts == 0)
+        {
+            return callouts;
+        }
+
         if (isSuccess)
         {
-            if (resolution.Losers.Count > 0 && resolution.Winners.Count > 0)
+            if (resolution.Losers.Count > 0 && resolution.Winners.Count > 0 && callouts.Count < maximumNamedCallouts)
             {
                 callouts.Add(
                     ReplaceTokens(
@@ -78,7 +102,7 @@ public sealed class HeistMessageComposer
 
             foreach (var winner in resolution.Winners)
             {
-                if (callouts.Count >= 2)
+                if (callouts.Count >= maximumNamedCallouts)
                 {
                     break;
                 }
@@ -97,7 +121,7 @@ public sealed class HeistMessageComposer
 
         foreach (var loser in resolution.Losers)
         {
-            if (callouts.Count >= 2)
+            if (callouts.Count >= maximumNamedCallouts)
             {
                 break;
             }
@@ -126,6 +150,7 @@ public sealed class HeistMessageComposer
         HeistParticipant? loser,
         HeistResolutionResult resolution)
     {
+        var participantCount = resolution.Winners.Count + resolution.Losers.Count + resolution.RefundedParticipants.Count;
         return new Dictionary<string, string>
         {
             ["winner"] = winner is null ? string.Empty : FormatViewerName(winner.Identity),
@@ -133,6 +158,7 @@ public sealed class HeistMessageComposer
             ["payout"] = winner is null ? string.Empty : FormatAmount(winner.PayoutAmount),
             ["winnerCount"] = resolution.Winners.Count.ToString(CultureInfo.InvariantCulture),
             ["loserCount"] = resolution.Losers.Count.ToString(CultureInfo.InvariantCulture),
+            ["participantCount"] = participantCount.ToString(CultureInfo.InvariantCulture),
             ["resolvedPot"] = FormatAmount(resolution.ResolvedPot),
             ["successChancePercent"] = FormatPercentage(resolution.SuccessChance)
         };

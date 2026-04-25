@@ -69,7 +69,7 @@ public sealed class ActionRuntimeFactory
     {
         var heistSettings = LoadHeistSettings(configurationPath);
         var heistRepository = new HeistRepository(connectionString, new SchemaBootstrapper());
-        var messageComposer = CreateHeistMessageComposer(heistMessageTemplatesPath);
+        var messageComposer = CreateHeistMessageComposer(heistMessageTemplatesPath, heistSettings);
         return new StartHeistAction(heistRepository, heistSettings, messageComposer);
     }
 
@@ -83,7 +83,7 @@ public sealed class ActionRuntimeFactory
     {
         var heistSettings = LoadHeistSettings(configurationPath);
         var heistRepository = new HeistRepository(connectionString, new SchemaBootstrapper());
-        var messageComposer = CreateHeistMessageComposer(heistMessageTemplatesPath);
+        var messageComposer = CreateHeistMessageComposer(heistMessageTemplatesPath, heistSettings);
         return new ResolveDueHeistsAction(
             heistRepository,
             new HeistChanceCalculator(heistSettings),
@@ -92,11 +92,11 @@ public sealed class ActionRuntimeFactory
             messageComposer);
     }
 
-    private static HeistMessageComposer CreateHeistMessageComposer(string? heistMessageTemplatesPath)
+    private static HeistMessageComposer CreateHeistMessageComposer(string? heistMessageTemplatesPath, HeistSettings heistSettings)
     {
         var loader = new HeistMessageTemplateLoader();
         HeistMessageTemplates templates = loader.Load(heistMessageTemplatesPath);
-        return new HeistMessageComposer(templates);
+        return new HeistMessageComposer(templates, heistSettings);
     }
 
     private static RewardSettings LoadRewardSettings(string? configurationPath)

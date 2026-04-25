@@ -103,6 +103,40 @@ public sealed class HeistRepositoryTests : IDisposable
         Assert.Equal(4_000m, repository.GetViewerBalance("joiner"));
     }
 
+    [Fact]
+    public void ApplyResolution_RefundsParticipantsWhenTheCrewIsBelowMinimumPlayers()
+    {
+        var repository = CreateRepository();
+        repository.SetViewerBalance("starter", 5_000m);
+        repository.SetViewerBalance("joiner", 5_000m);
+        var roundId = repository.StartRound(
+            CreateViewer("starter"),
+            1_000m,
+            new DateTimeOffset(2026, 4, 23, 20, 0, 0, TimeSpan.Zero),
+            new DateTimeOffset(2026, 4, 23, 20, 2, 0, TimeSpan.Zero));
+        repository.JoinOpenRound(CreateViewer("joiner"), 1_000m, new DateTimeOffset(2026, 4, 23, 20, 1, 0, TimeSpan.Zero));
+
+        var refundedParticipants = repository.GetParticipants(roundId);
+        var resolution = new HeistResolutionResult
+        {
+            RoundId = roundId,
+            FinalState = HeistRoundState.InsufficientCrew,
+            SuccessChance = 0.75m,
+            OriginalPot = 2_000m,
+            ResolvedPot = 2_000m,
+            ResolvedAtUtc = new DateTimeOffset(2026, 4, 23, 20, 2, 0, TimeSpan.Zero),
+            Winners = Array.Empty<HeistParticipant>(),
+            Losers = Array.Empty<HeistParticipant>(),
+            RefundedParticipants = refundedParticipants
+        };
+
+        repository.ApplyResolution(resolution);
+
+        Assert.Null(repository.GetOpenRoundId());
+        Assert.Equal(5_000m, repository.GetViewerBalance("starter"));
+        Assert.Equal(5_000m, repository.GetViewerBalance("joiner"));
+    }
+
     public void Dispose()
     {
         if (File.Exists(databasePath))

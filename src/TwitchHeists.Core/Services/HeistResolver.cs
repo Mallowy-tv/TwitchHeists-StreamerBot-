@@ -27,6 +27,22 @@ public sealed class HeistResolver
         }
 
         var originalPot = participants.Sum(participant => participant.StakeAmount);
+        if (participants.Count < heistSettings.MinimumPlayers)
+        {
+            return new HeistResolutionResult
+            {
+                RoundId = roundId,
+                FinalState = HeistRoundState.InsufficientCrew,
+                SuccessChance = successChance,
+                OriginalPot = originalPot,
+                ResolvedPot = originalPot,
+                Winners = Array.Empty<HeistParticipant>(),
+                Losers = Array.Empty<HeistParticipant>(),
+                RefundedParticipants = participants.Select(CloneParticipant).ToArray(),
+                ResolvedAtUtc = resolvedAtUtc
+            };
+        }
+
         var wasSuccessful = (decimal)nextRandomValue() <= successChance;
 
         if (!wasSuccessful)
@@ -45,7 +61,7 @@ public sealed class HeistResolver
         }
 
         var remainingParticipants = participants.Select(CloneParticipant).ToList();
-        var winnerCount = Math.Min(heistSettings.MaximumWinnerCount, remainingParticipants.Count);
+        var winnerCount = ResolveWinnerCount(remainingParticipants.Count);
         var winners = new List<HeistParticipant>(winnerCount);
 
         for (var index = 0; index < winnerCount; index++)
@@ -76,6 +92,53 @@ public sealed class HeistResolver
             Losers = remainingParticipants,
             ResolvedAtUtc = resolvedAtUtc
         };
+    }
+
+    private int ResolveWinnerCount(int participantCount)
+    {
+        var band = ResolveWinnerBand(participantCount);
+        if (band is null)
+        {
+            return Math.Min(heistSettings.MaximumWinnerCount, participantCount);
+        }
+
+        var winnerRange = band.GetClampedWinnerRange(participantCount);
+        if (winnerRange.MinimumWinners == winnerRange.MaximumWinners)
+        {
+            return winnerRange.MinimumWinners;
+        }
+
+        var rangeSize = winnerRange.MaximumWinners - winnerRange.MinimumWinners + 1;
+        var randomOffset = (int)Math.Floor(nextRandomValue() * rangeSize);
+        if (randomOffset >= rangeSize)
+        {
+            randomOffset = rangeSize - 1;
+        }
+
+        return winnerRange.MinimumWinners + randomOffset;
+    }
+
+    private HeistWinnerBand? ResolveWinnerBand(int participantCount)
+    {
+        var winnerBands = heistSettings.WinnerBands
+            .OrderBy(band => band.MinimumParticipants)
+            .ToList();
+
+        if (winnerBands.Count == 0)
+        {
+            return null;
+        }
+
+        var exactBand = winnerBands.FirstOrDefault(band => band.ContainsParticipants(participantCount));
+        if (exactBand is not null)
+        {
+            return exactBand;
+        }
+
+        var lastBand = winnerBands[winnerBands.Count - 1];
+        return participantCount > lastBand.MaximumParticipants
+            ? lastBand
+            : null;
     }
 
     private static void AllocateWinnerPayouts(IReadOnlyList<HeistParticipant> winners, decimal resolvedPot)

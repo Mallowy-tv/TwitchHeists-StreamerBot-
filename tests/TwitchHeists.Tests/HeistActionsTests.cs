@@ -105,7 +105,7 @@ public sealed class HeistActionsTests : IDisposable
     }
 
     [Fact]
-    public void ResolveDueHeistsAction_ResolvesTheHeistWhenDue()
+    public void ResolveDueHeistsAction_ReturnsInsufficientCrewByDefaultForASoloHeist()
     {
         SeedBalance("starter", 500m);
         var repository = CreateRepository();
@@ -125,8 +125,8 @@ public sealed class HeistActionsTests : IDisposable
         var result = resolveAction.Execute(startedAt.AddMinutes(2));
 
         Assert.True(result.Success);
-        Assert.Contains("crew", result.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Success chance was", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("too small", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("100", result.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -183,6 +183,7 @@ public sealed class HeistActionsTests : IDisposable
         SeedBalance("starter", 500m);
         var repository = CreateRepository();
         var settings = CreateSettings();
+        settings.MinimumPlayers = 1;
         var composer = CreateMessageComposer(new HeistMessageTemplates
         {
             StartMessages = new List<string> { "ACTION START {starter} {stake} {joinWindow}" },
@@ -194,7 +195,7 @@ public sealed class HeistActionsTests : IDisposable
             FailureCallouts = new List<string> { "ACTION LOSER {loser}" },
             SacrificeCallouts = new List<string> { "ACTION SACRIFICE {loser} {winner}" },
             ResultSummaries = new List<string> { "ACTION SUMMARY {winnerCount} {loserCount} {resolvedPot} {successChancePercent}" }
-        });
+        }, settings);
         var startAction = CreateStartAction(repository, settings, composer);
         var resolveAction = CreateResolveAction(repository, settings, composer);
         var startedAt = new DateTimeOffset(2026, 4, 25, 16, 0, 0, TimeSpan.Zero);
@@ -212,6 +213,102 @@ public sealed class HeistActionsTests : IDisposable
 
         Assert.Equal("ACTION REMINDER 1 minute 100 1", reminder.Message);
         Assert.Equal("ACTION SUCCESS HEADLINE ACTION WINNER starter 200 ACTION SUMMARY 1 0 200 74.59%", result.Message);
+    }
+
+    [Fact]
+    public void ResolveDueHeistsAction_UsesProvidedTemplateForInsufficientCrewResults()
+    {
+        SeedBalance("starter", 500m);
+        var repository = CreateRepository();
+        var settings = CreateSettings();
+        var composer = CreateMessageComposer(new HeistMessageTemplates
+        {
+            StartMessages = new List<string> { "ACTION START {starter} {stake} {joinWindow}" },
+            CooldownMessages = new List<string> { "ACTION COOLDOWN {cooldownRemaining}" },
+            ReminderMessages = new List<string> { "ACTION REMINDER {countdown} {pot} {participantCount}" },
+            SuccessHeadlines = new List<string> { "ACTION SUCCESS HEADLINE" },
+            FailureHeadlines = new List<string> { "ACTION FAILURE HEADLINE" },
+            SuccessCallouts = new List<string> { "ACTION WINNER {winner} {payout}" },
+            FailureCallouts = new List<string> { "ACTION LOSER {loser}" },
+            SacrificeCallouts = new List<string> { "ACTION SACRIFICE {loser} {winner}" },
+            ResultSummaries = new List<string> { "ACTION SUMMARY {winnerCount} {loserCount} {resolvedPot} {successChancePercent}" },
+            InsufficientCrewMessages = new List<string> { "ACTION INSUFFICIENT {participantCount} {resolvedPot}" }
+        }, settings);
+        var startAction = CreateStartAction(repository, settings, composer);
+        var resolveAction = CreateResolveAction(repository, settings, composer);
+        var startedAt = new DateTimeOffset(2026, 4, 25, 16, 0, 0, TimeSpan.Zero);
+
+        startAction.Execute(new HeistCommandDto
+        {
+            Username = "starter",
+            DisplayName = "Starter",
+            StakeAmount = 100m,
+            OccurredAtUtc = startedAt
+        });
+
+        var result = resolveAction.Execute(startedAt.AddMinutes(2));
+
+        Assert.True(result.Success);
+        Assert.Equal("ACTION INSUFFICIENT 1 100", result.Message);
+    }
+
+    [Fact]
+    public void ResolveDueHeistsAction_KeepsLargeSuccessfulMessagesToOneNamedCallout()
+    {
+        SeedBalance("starter", 500m);
+        SeedBalance("viewer2", 500m);
+        SeedBalance("viewer3", 500m);
+        SeedBalance("viewer4", 500m);
+        SeedBalance("viewer5", 500m);
+        SeedBalance("viewer6", 500m);
+        var repository = CreateRepository();
+        var settings = CreateSettings();
+        settings.MinimumPlayers = 2;
+        settings.MaximumNamedResolutionCallouts = 1;
+
+        var composer = CreateMessageComposer(new HeistMessageTemplates
+        {
+            StartMessages = new List<string> { "ACTION START {starter} {stake} {joinWindow}" },
+            CooldownMessages = new List<string> { "ACTION COOLDOWN {cooldownRemaining}" },
+            ReminderMessages = new List<string> { "ACTION REMINDER {countdown} {pot} {participantCount}" },
+            SuccessHeadlines = new List<string> { "ACTION SUCCESS HEADLINE" },
+            FailureHeadlines = new List<string> { "ACTION FAILURE HEADLINE" },
+            SuccessCallouts = new List<string> { "ACTION CALLOUT {winner} {payout}" },
+            FailureCallouts = new List<string> { "ACTION LOSER {loser}" },
+            SacrificeCallouts = new List<string> { "ACTION CALLOUT {loser} {winner}" },
+            ResultSummaries = new List<string> { "ACTION SUMMARY {winnerCount} {loserCount} {resolvedPot} {successChancePercent}" }
+        }, settings);
+        var startAction = CreateStartAction(repository, settings, composer);
+        var joinAction = CreateJoinAction(repository);
+        var resolveAction = CreateResolveAction(repository, settings, composer);
+        var startedAt = new DateTimeOffset(2026, 4, 25, 16, 0, 0, TimeSpan.Zero);
+
+        startAction.Execute(new HeistCommandDto
+        {
+            Username = "starter",
+            DisplayName = "Starter",
+            StakeAmount = 100m,
+            OccurredAtUtc = startedAt
+        });
+
+        foreach (var viewer in new[] { "viewer2", "viewer3", "viewer4", "viewer5", "viewer6" })
+        {
+            var joinResult = joinAction.Execute(new HeistCommandDto
+            {
+                Username = viewer,
+                DisplayName = viewer,
+                StakeAmount = 100m,
+                OccurredAtUtc = startedAt.AddSeconds(15)
+            });
+
+            Assert.True(joinResult.Success);
+        }
+
+        var result = resolveAction.Execute(startedAt.AddMinutes(2));
+
+        Assert.True(result.Success);
+        Assert.Equal(1, CountOccurrences(result.Message, "ACTION CALLOUT"));
+        Assert.Contains("ACTION SUMMARY", result.Message, StringComparison.Ordinal);
     }
 
     public void Dispose()
@@ -235,7 +332,7 @@ public sealed class HeistActionsTests : IDisposable
         return new StartHeistAction(
             repository ?? CreateRepository(),
             settings ?? CreateSettings(),
-            messageComposer ?? CreateMessageComposer());
+            messageComposer ?? CreateMessageComposer(settings: settings ?? CreateSettings()));
     }
 
     private ResolveDueHeistsAction CreateResolveAction(
@@ -250,7 +347,12 @@ public sealed class HeistActionsTests : IDisposable
             new HeistChanceCalculator(resolvedSettings),
             new HeistResolver(resolvedSettings, () => 0.01),
             resolvedSettings,
-            messageComposer ?? CreateMessageComposer());
+            messageComposer ?? CreateMessageComposer(settings: resolvedSettings));
+    }
+
+    private JoinHeistAction CreateJoinAction(HeistRepository? repository = null)
+    {
+        return new JoinHeistAction(repository ?? CreateRepository());
     }
 
     private static HeistSettings CreateSettings()
@@ -263,9 +365,27 @@ public sealed class HeistActionsTests : IDisposable
         };
     }
 
-    private static HeistMessageComposer CreateMessageComposer(HeistMessageTemplates? templates = null)
+    private static HeistMessageComposer CreateMessageComposer(HeistMessageTemplates? templates = null, HeistSettings? settings = null)
     {
-        return new HeistMessageComposer(templates ?? HeistMessageTemplates.CreateDefault(), _ => 0);
+        return new HeistMessageComposer(templates ?? HeistMessageTemplates.CreateDefault(), settings ?? CreateSettings(), _ => 0);
+    }
+
+    private static int CountOccurrences(string value, string token)
+    {
+        var count = 0;
+        var startIndex = 0;
+
+        while (true)
+        {
+            var index = value.IndexOf(token, startIndex, StringComparison.Ordinal);
+            if (index < 0)
+            {
+                return count;
+            }
+
+            count++;
+            startIndex = index + token.Length;
+        }
     }
 
     private void SeedBalance(string normalizedUsername, decimal pointsBalance)

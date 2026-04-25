@@ -58,6 +58,7 @@ The bridge resolves the database under `data\twitch-heists.db` inside the instal
 - start messages
 - cooldown messages
 - countdown reminders
+- insufficient-crew results
 - success headlines and callouts
 - failure headlines and callouts
 - final result summaries
@@ -97,7 +98,10 @@ All bridge methods return a `BridgeResult` with `Success`, `Message`, `RewardedV
 - Reminder thresholds: `00:01:00`, `00:00:30`, `00:00:10`
 - Success chance floor: `40%`
 - Success chance ceiling: `75%`
-- Max winners: `5`
+- Minimum players: `2`
+- Winner bands: adaptive by crew size (for example `2-5 => 1-5`, `6-10 => 3-7`, `51-60 => 12-16`, `141-150 => 21-34`)
+- Maximum named resolution callouts: `2`
+- Maximum winner count: `5` fallback only when no winner band applies
 - Success pot multiplier: `2x`
 
 ## Behavior notes
@@ -110,7 +114,10 @@ All bridge methods return a `BridgeResult` with `Success`, `Message`, `RewardedV
 - If a viewer missed the previous completed stream, their next qualifying sighting restarts the streak at `1` instead of continuing the old chain.
 - Heist stake reservations and resolutions run inside transactions so points and round state stay aligned.
 - `!heist` opens a 2-minute join window, sends 1m / 30s / 10s countdown reminders through the heist timer action, and enforces a 5-minute cooldown after results.
-- `heist-messages.json` drives every heist chat line with placeholder tokens such as `{starter}`, `{stake}`, `{joinWindow}`, `{cooldownRemaining}`, `{countdown}`, `{pot}`, `{participantCount}`, `{winner}`, `{loser}`, `{payout}`, `{winnerCount}`, `{loserCount}`, `{resolvedPot}`, and `{successChancePercent}`.
+- Heists with fewer than `MinimumPlayers` resolve as **not enough crew** and refund every joined stake instead of forcing a win or loss.
+- Successful heists now choose a winner count from the configured adaptive winner bands instead of always using a fixed cap.
+- Resolved heist messages stay summary-first and only use a small number of named callouts, controlled by `MaximumNamedResolutionCallouts`.
+- `heist-messages.json` drives every heist chat line with placeholder tokens such as `{starter}`, `{stake}`, `{joinWindow}`, `{cooldownRemaining}`, `{countdown}`, `{pot}`, `{participantCount}`, `{winner}`, `{loser}`, `{payout}`, `{winnerCount}`, `{loserCount}`, `{resolvedPot}`, and `{successChancePercent}`. The new `insufficientCrewMessages` group uses the same token set, especially `{participantCount}` and `{resolvedPot}`.
 - Balances, watchtime, and heist stakes now use Twitch user ID as the canonical identity whenever Streamer.bot provides it, then fall back to usernames for older rows and older command payloads.
 - When a legacy username-only balance row is next seen with a Twitch user ID, TwitchHeists adopts that row into the Twitch-ID-backed identity so future Twitch renames do not split points or watchtime.
 - `!points give` transfers existing balance from the sender to the target; it does not mint new points.

@@ -31,6 +31,9 @@ public sealed class HeistMessageTemplates
     [JsonPropertyName("resultSummaries")]
     public List<string> ResultSummaries { get; set; } = new();
 
+    [JsonPropertyName("insufficientCrewMessages")]
+    public List<string> InsufficientCrewMessages { get; set; } = new();
+
     public static HeistMessageTemplates CreateDefault()
     {
         return new HeistMessageTemplates
@@ -80,6 +83,10 @@ public sealed class HeistMessageTemplates
             ResultSummaries = new List<string>
             {
                 "{winnerCount} got out with {resolvedPot} points while {loserCount} were left behind. Success chance was {successChancePercent}."
+            },
+            InsufficientCrewMessages = new List<string>
+            {
+                "The crew was too small to leave the hideout. {participantCount} joined, so everyone got their {resolvedPot} points back."
             }
         };
     }
