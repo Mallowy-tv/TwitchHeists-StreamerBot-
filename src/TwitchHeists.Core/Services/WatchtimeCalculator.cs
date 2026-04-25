@@ -59,7 +59,15 @@ public sealed class WatchtimeCalculator
                 ActiveSinceUtc = confirmedRecord.ActiveSinceUtc == default ? cycleTimestampUtc : confirmedRecord.ActiveSinceUtc
             };
 
-            resolvedPresence.Identity = confirmedRecord.Identity;
+            resolvedPresence.Identity = new ViewerIdentity
+            {
+                TwitchUserId = string.IsNullOrWhiteSpace(confirmedRecord.Identity.TwitchUserId)
+                    ? existingRecord?.Identity.TwitchUserId
+                    : confirmedRecord.Identity.TwitchUserId,
+                Username = confirmedRecord.Identity.Username,
+                NormalizedUsername = confirmedRecord.Identity.NormalizedUsername,
+                DisplayName = confirmedRecord.Identity.DisplayName
+            };
             resolvedPresence.ActiveSinceUtc = existingRecord?.ActiveSinceUtc ?? resolvedPresence.ActiveSinceUtc;
             resolvedPresence.LastSeenUtc = cycleTimestampUtc;
             resolvedPresence.LastConfirmedRefreshUtc = cycleTimestampUtc;

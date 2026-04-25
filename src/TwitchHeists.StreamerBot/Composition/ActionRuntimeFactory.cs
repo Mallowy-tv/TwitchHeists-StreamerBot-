@@ -13,14 +13,20 @@ public sealed class ActionRuntimeFactory
     public RefreshCommunityViewersAction CreateRefreshCommunityViewersAction(string connectionString, string? configurationPath = null)
     {
         var rewardSettings = LoadRewardSettings(configurationPath);
-        var viewerRepository = new ViewerRepository(connectionString, new SchemaBootstrapper());
-        return new RefreshCommunityViewersAction(viewerRepository, new WatchtimeCalculator(rewardSettings));
+        var schemaBootstrapper = new SchemaBootstrapper();
+        var viewerRepository = new ViewerRepository(connectionString, schemaBootstrapper);
+        var watchStreakRepository = new WatchStreakRepository(connectionString, schemaBootstrapper);
+        var watchStreakService = new WatchStreakService(watchStreakRepository, viewerRepository);
+        return new RefreshCommunityViewersAction(viewerRepository, new WatchtimeCalculator(rewardSettings), watchStreakService);
     }
 
     public RecordChatPresenceAction CreateRecordChatPresenceAction(string connectionString)
     {
-        var viewerRepository = new ViewerRepository(connectionString, new SchemaBootstrapper());
-        return new RecordChatPresenceAction(viewerRepository);
+        var schemaBootstrapper = new SchemaBootstrapper();
+        var viewerRepository = new ViewerRepository(connectionString, schemaBootstrapper);
+        var watchStreakRepository = new WatchStreakRepository(connectionString, schemaBootstrapper);
+        var watchStreakService = new WatchStreakService(watchStreakRepository, viewerRepository);
+        return new RecordChatPresenceAction(viewerRepository, watchStreakService);
     }
 
     public AddPointsAction CreateAddPointsAction(string connectionString)
@@ -45,6 +51,18 @@ public sealed class ActionRuntimeFactory
     {
         var viewerRepository = new ViewerRepository(connectionString, new SchemaBootstrapper());
         return new GetWatchtimeAction(viewerRepository);
+    }
+
+    public StartStreamAction CreateStartStreamAction(string connectionString)
+    {
+        var watchStreakRepository = new WatchStreakRepository(connectionString, new SchemaBootstrapper());
+        return new StartStreamAction(watchStreakRepository);
+    }
+
+    public EndStreamAction CreateEndStreamAction(string connectionString)
+    {
+        var watchStreakRepository = new WatchStreakRepository(connectionString, new SchemaBootstrapper());
+        return new EndStreamAction(watchStreakRepository);
     }
 
     public StartHeistAction CreateStartHeistAction(string connectionString, string? configurationPath = null, string? heistMessageTemplatesPath = null)

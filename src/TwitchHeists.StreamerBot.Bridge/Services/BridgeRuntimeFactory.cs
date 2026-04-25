@@ -38,6 +38,16 @@ public sealed class BridgeRuntimeFactory
         return actionRuntimeFactory.CreateAddPointsAction(BuildConnectionString(installDirectory));
     }
 
+    public StartStreamAction CreateStartStreamAction(string installDirectory)
+    {
+        return actionRuntimeFactory.CreateStartStreamAction(BuildConnectionString(installDirectory));
+    }
+
+    public EndStreamAction CreateEndStreamAction(string installDirectory)
+    {
+        return actionRuntimeFactory.CreateEndStreamAction(BuildConnectionString(installDirectory));
+    }
+
     public RemovePointsAction CreateRemovePointsAction(string installDirectory)
     {
         return actionRuntimeFactory.CreateRemovePointsAction(BuildConnectionString(installDirectory));
@@ -81,7 +91,7 @@ public sealed class BridgeRuntimeFactory
         Directory.CreateDirectory(dataDirectory);
         var databasePath = Path.Combine(dataDirectory, DatabaseFileName);
 
-        return $@"Data Source={databasePath};Pooling=False";
+        return $@"Data Source={databasePath};Mode=ReadWriteCreate;Pooling=True;Default Timeout=5";
     }
 
     private static string? ResolveConfigurationPath(string installDirectory)

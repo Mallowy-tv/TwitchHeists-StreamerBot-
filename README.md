@@ -21,6 +21,14 @@ dotnet build .\TwitchHeists.sln
 dotnet test .\TwitchHeists.sln
 ```
 
+Mixed-load benchmark command:
+
+```powershell
+dotnet test .\tests\TwitchHeists.Tests\TwitchHeists.Tests.csproj --filter MixedLoadPerformanceTests --logger "console;verbosity=detailed"
+```
+
+The benchmark runs a 1,000-viewer mixed stream scenario and prints timings for the community refresh phase, chat burst phase, heist start/join/resolve phases, and total runtime.
+
 Use this folder for Streamer.bot deployment:
 
 - `src\TwitchHeists.StreamerBot.Bridge\bin\Release\net48\`
@@ -62,13 +70,15 @@ Set up Execute C# Code actions in Streamer.bot and call the bridge layer through
 
 1. **Community refresh** every 5 minutes with `RefreshCommunityViewers`
 2. **Chat presence** on every chat message with `RecordChatPresence`
-3. **Heist start** on `!heist <amount>` with `StartHeist`
-4. **Heist join** on `!join <amount>` with `JoinHeist`
-5. **Heist resolution** on a short timer with `ResolveDueHeists`
-6. **Points add** on `!points add <user> <amount>` with `AddPoints`
-7. **Points remove** on `!points remove <user> <amount>` with `RemovePoints`
-8. **Points give** on `!points give <user> <amount>` with `GivePoints`
-9. **Watchtime** on `!watchtime` or `!watchtime <user>` with `GetWatchtime`
+3. **Stream start** on your go-live trigger with `StartStream`
+4. **Stream end** on your offline trigger with `EndStream`
+5. **Heist start** on `!heist <amount>` with `StartHeist`
+6. **Heist join** on `!join <amount>` with `JoinHeist`
+7. **Heist resolution** on a short timer with `ResolveDueHeists`
+8. **Points add** on `!points add <user> <amount>` with `AddPoints`
+9. **Points remove** on `!points remove <user> <amount>` with `RemovePoints`
+10. **Points give** on `!points give <user> <amount>` with `GivePoints`
+11. **Watchtime** on `!watchtime` or `!watchtime <user>` with `GetWatchtime`
 
 All bridge methods return a `BridgeResult` with `Success`, `Message`, `RewardedViewerCount`, `ExpiredViewerCount`, and `TotalPointsAwarded`.
 
@@ -95,9 +105,14 @@ All bridge methods return a `BridgeResult` with `Success`, `Message`, `RewardedV
 - Community refreshes are processed as a single cycle against SQLite instead of one write per viewer.
 - Reward cycles are idempotent per timestamp, so retries do not double-award watchtime or points.
 - Chat-only presence expires at the next refresh boundary if the viewer never appears in the Community snapshot.
+- Watch streaks only qualify while an explicit stream is active; `StartStream` marks the stream live, `EndStream` marks it offline, and off-stream chat does not advance streaks.
+- A viewer gets streak points silently on the first qualifying sighting of a live stream: streak `1` awards `100`, streak `2` awards `200`, and so on.
+- If a viewer missed the previous completed stream, their next qualifying sighting restarts the streak at `1` instead of continuing the old chain.
 - Heist stake reservations and resolutions run inside transactions so points and round state stay aligned.
 - `!heist` opens a 2-minute join window, sends 1m / 30s / 10s countdown reminders through the heist timer action, and enforces a 5-minute cooldown after results.
 - `heist-messages.json` drives every heist chat line with placeholder tokens such as `{starter}`, `{stake}`, `{joinWindow}`, `{cooldownRemaining}`, `{countdown}`, `{pot}`, `{participantCount}`, `{winner}`, `{loser}`, `{payout}`, `{winnerCount}`, `{loserCount}`, `{resolvedPot}`, and `{successChancePercent}`.
+- Balances, watchtime, and heist stakes now use Twitch user ID as the canonical identity whenever Streamer.bot provides it, then fall back to usernames for older rows and older command payloads.
+- When a legacy username-only balance row is next seen with a Twitch user ID, TwitchHeists adopts that row into the Twitch-ID-backed identity so future Twitch renames do not split points or watchtime.
 - `!points give` transfers existing balance from the sender to the target; it does not mint new points.
 - `!points add all` and `!points remove all` target viewers currently marked active in TwitchHeists presence tracking.
 - `!watchtime` reads lifetime rewarded watch minutes from the same SQLite balance store.

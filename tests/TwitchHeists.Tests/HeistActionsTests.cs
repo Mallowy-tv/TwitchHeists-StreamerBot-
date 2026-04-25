@@ -159,6 +159,25 @@ public sealed class HeistActionsTests : IDisposable
     }
 
     [Fact]
+    public void StartHeistAction_UsesTwitchIdBalanceWhenUsernameChanged()
+    {
+        SeedBalance("legacyname", "heist-user-1", 500m);
+        var action = CreateStartAction();
+
+        var result = action.Execute(new HeistCommandDto
+        {
+            TwitchUserId = "heist-user-1",
+            Username = "renamedviewer",
+            DisplayName = "RenamedViewer",
+            StakeAmount = 100m,
+            OccurredAtUtc = new DateTimeOffset(2026, 4, 25, 16, 0, 0, TimeSpan.Zero)
+        });
+
+        Assert.True(result.Success);
+        Assert.Equal("renamedviewer started a heist with 100 points. Starting in 2 minutes.", result.Message);
+    }
+
+    [Fact]
     public void ResolveDueHeistsAction_UsesProvidedMessageTemplates()
     {
         SeedBalance("starter", 500m);
@@ -251,6 +270,11 @@ public sealed class HeistActionsTests : IDisposable
 
     private void SeedBalance(string normalizedUsername, decimal pointsBalance)
     {
+        SeedBalance(normalizedUsername, twitchUserId: null, pointsBalance);
+    }
+
+    private void SeedBalance(string normalizedUsername, string? twitchUserId, decimal pointsBalance)
+    {
         using var connection = new SqliteConnection($"Data Source={databasePath};Pooling=False");
         connection.Open();
         new SchemaBootstrapper().EnsureCreated(connection);
@@ -260,21 +284,25 @@ public sealed class HeistActionsTests : IDisposable
             """
             INSERT INTO viewer_balances (
                 normalized_username,
+                twitch_user_id,
                 points_balance,
                 total_watch_minutes,
                 updated_at_utc
             )
             VALUES (
                 $normalizedUsername,
+                $twitchUserId,
                 $pointsBalance,
                 0,
                 $updatedAtUtc
             )
             ON CONFLICT(normalized_username) DO UPDATE SET
+                twitch_user_id = excluded.twitch_user_id,
                 points_balance = excluded.points_balance,
                 updated_at_utc = excluded.updated_at_utc;
             """;
         command.Parameters.AddWithValue("$normalizedUsername", normalizedUsername);
+        command.Parameters.AddWithValue("$twitchUserId", (object?)twitchUserId ?? DBNull.Value);
         command.Parameters.AddWithValue("$pointsBalance", pointsBalance.ToString(CultureInfo.InvariantCulture));
         command.Parameters.AddWithValue("$updatedAtUtc", DateTimeOffset.UtcNow.UtcDateTime.ToString("O", CultureInfo.InvariantCulture));
         command.ExecuteNonQuery();

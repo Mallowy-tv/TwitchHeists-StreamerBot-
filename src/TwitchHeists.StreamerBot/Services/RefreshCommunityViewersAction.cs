@@ -9,11 +9,16 @@ public sealed class RefreshCommunityViewersAction
 {
     private readonly ViewerRepository viewerRepository;
     private readonly WatchtimeCalculator watchtimeCalculator;
+    private readonly WatchStreakService? watchStreakService;
 
-    public RefreshCommunityViewersAction(ViewerRepository viewerRepository, WatchtimeCalculator watchtimeCalculator)
+    public RefreshCommunityViewersAction(
+        ViewerRepository viewerRepository,
+        WatchtimeCalculator watchtimeCalculator,
+        WatchStreakService? watchStreakService = null)
     {
         this.viewerRepository = viewerRepository;
         this.watchtimeCalculator = watchtimeCalculator;
+        this.watchStreakService = watchStreakService;
     }
 
     public ActionResponseDto Execute(DateTimeOffset refreshTimestampUtc, IEnumerable<CommunityViewerDto> snapshot)
@@ -48,6 +53,11 @@ public sealed class RefreshCommunityViewersAction
             cycleResult.ActivePresence,
             cycleResult.ExpiredPresence,
             cycleResult.Rewards);
+
+        if (watchStreakService is not null)
+        {
+            watchStreakService.ApplySightings(confirmedPresence.Select(record => record.Identity), refreshTimestampUtc);
+        }
 
         if (!applied)
         {

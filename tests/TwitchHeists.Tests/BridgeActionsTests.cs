@@ -65,6 +65,73 @@ public sealed class BridgeActionsTests : IDisposable
     }
 
     [Fact]
+    public void StartStreamAndEndStream_ReturnFriendlyLifecycleMessages()
+    {
+        EnsureInstallDirectory();
+        var actions = new BridgeActions();
+        var startedAt = new DateTimeOffset(2026, 4, 25, 18, 0, 0, TimeSpan.Zero);
+
+        var startResult = actions.StartStream(
+            installDirectory,
+            new BridgeStreamLifecycleCommand
+            {
+                OccurredAtUtc = startedAt
+            });
+        var endResult = actions.EndStream(
+            installDirectory,
+            new BridgeStreamLifecycleCommand
+            {
+                OccurredAtUtc = startedAt.AddHours(4)
+            });
+
+        Assert.True(startResult.Success);
+        Assert.True(endResult.Success);
+        Assert.Contains("marked live", startResult.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("marked offline", endResult.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void RecordChatPresence_DuringAnActiveStreamAwardsSilentWatchStreakPoints()
+    {
+        EnsureInstallDirectory();
+        var actions = new BridgeActions();
+        var startedAt = new DateTimeOffset(2026, 4, 25, 18, 0, 0, TimeSpan.Zero);
+
+        var startResult = actions.StartStream(
+            installDirectory,
+            new BridgeStreamLifecycleCommand
+            {
+                OccurredAtUtc = startedAt
+            });
+        var presenceResult = actions.RecordChatPresence(
+            installDirectory,
+            new BridgeChatPresence
+            {
+                TwitchUserId = "bridge-streak-1",
+                Username = "viewerone",
+                DisplayName = "ViewerOne",
+                MessageReceivedAtUtc = startedAt.AddMinutes(1)
+            },
+            startedAt.AddMinutes(5));
+        var repeatedPresenceResult = actions.RecordChatPresence(
+            installDirectory,
+            new BridgeChatPresence
+            {
+                TwitchUserId = "bridge-streak-1",
+                Username = "viewerone",
+                DisplayName = "ViewerOne",
+                MessageReceivedAtUtc = startedAt.AddMinutes(2)
+            },
+            startedAt.AddMinutes(5));
+
+        Assert.True(startResult.Success);
+        Assert.True(presenceResult.Success);
+        Assert.True(repeatedPresenceResult.Success);
+        Assert.Equal("viewerone recorded from chat activity.", presenceResult.Message);
+        Assert.Equal(100m, GetBalance("viewerone"));
+    }
+
+    [Fact]
     public void StartHeist_ReturnsFriendlyFailureMessages()
     {
         Directory.CreateDirectory(Path.Combine(installDirectory, "data"));
@@ -486,6 +553,40 @@ public sealed class BridgeActionsTests : IDisposable
     }
 
     [Fact]
+    public void AddPoints_UsesTargetTwitchIdWhenUsernameChanged()
+    {
+        EnsureInstallDirectory();
+        SeedBalance("legacyname", "bridge-user-1", 100m, 0);
+        var actions = new BridgeActions();
+
+        var result = actions.AddPoints(
+            installDirectory,
+            new BridgePointsCommand
+            {
+                TargetTwitchUserId = "bridge-user-1",
+                TargetUsername = "renamedviewer",
+                TargetDisplayName = "RenamedViewer",
+                Amount = 25m,
+                OccurredAtUtc = new DateTimeOffset(2026, 4, 25, 16, 0, 0, TimeSpan.Zero)
+            });
+
+        Assert.True(result.Success);
+
+        var databasePath = Path.Combine(installDirectory, "data", "twitch-heists.db");
+        using var connection = new SqliteConnection($@"Data Source={databasePath};Pooling=False");
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT points_balance
+            FROM viewer_balances
+            WHERE normalized_username = 'renamedviewer';
+            """;
+
+        Assert.Equal("125", Convert.ToString(command.ExecuteScalar(), CultureInfo.InvariantCulture));
+    }
+
+    [Fact]
     public void RemovePoints_ClampsBalanceToZero()
     {
         EnsureInstallDirectory();
@@ -595,11 +696,52 @@ public sealed class BridgeActionsTests : IDisposable
         Assert.Contains("2h 15m", result.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void GetWatchtime_UsesTargetTwitchIdWhenUsernameChanged()
+    {
+        EnsureInstallDirectory();
+        SeedBalance("legacyname", "bridge-watchtime-1", 0m, 135);
+        var actions = new BridgeActions();
+
+        var result = actions.GetWatchtime(
+            installDirectory,
+            new BridgeWatchtimeQuery
+            {
+                RequesterTwitchUserId = "requester-1",
+                RequesterUsername = "viewerone",
+                RequesterDisplayName = "ViewerOne",
+                TargetTwitchUserId = "bridge-watchtime-1",
+                TargetUsername = "renamedviewer",
+                TargetDisplayName = "RenamedViewer",
+                OccurredAtUtc = new DateTimeOffset(2026, 4, 25, 16, 0, 0, TimeSpan.Zero)
+            });
+
+        Assert.True(result.Success);
+        Assert.Contains("2h 15m", result.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(installDirectory))
         {
-            Directory.Delete(installDirectory, true);
+            SqliteConnection.ClearAllPools();
+
+            for (var attempt = 0; attempt < 3; attempt++)
+            {
+                try
+                {
+                    Directory.Delete(installDirectory, true);
+                    break;
+                }
+                catch (IOException) when (attempt < 2)
+                {
+                    Thread.Sleep(50);
+                }
+                catch (UnauthorizedAccessException) when (attempt < 2)
+                {
+                    Thread.Sleep(50);
+                }
+            }
         }
     }
 
@@ -636,6 +778,11 @@ public sealed class BridgeActionsTests : IDisposable
 
     private void SeedBalance(string normalizedUsername, decimal pointsBalance, int totalWatchMinutes)
     {
+        SeedBalance(normalizedUsername, twitchUserId: null, pointsBalance, totalWatchMinutes);
+    }
+
+    private void SeedBalance(string normalizedUsername, string? twitchUserId, decimal pointsBalance, int totalWatchMinutes)
+    {
         var databasePath = Path.Combine(installDirectory, "data", "twitch-heists.db");
         using var connection = new SqliteConnection($@"Data Source={databasePath};Pooling=False");
         connection.Open();
@@ -646,22 +793,26 @@ public sealed class BridgeActionsTests : IDisposable
             """
             INSERT INTO viewer_balances (
                 normalized_username,
+                twitch_user_id,
                 points_balance,
                 total_watch_minutes,
                 updated_at_utc
             )
             VALUES (
                 $normalizedUsername,
+                $twitchUserId,
                 $pointsBalance,
                 $totalWatchMinutes,
                 $updatedAtUtc
             )
             ON CONFLICT(normalized_username) DO UPDATE SET
+                twitch_user_id = excluded.twitch_user_id,
                 points_balance = excluded.points_balance,
                 total_watch_minutes = excluded.total_watch_minutes,
                 updated_at_utc = excluded.updated_at_utc;
             """;
         command.Parameters.AddWithValue("$normalizedUsername", normalizedUsername);
+        command.Parameters.AddWithValue("$twitchUserId", (object?)twitchUserId ?? DBNull.Value);
         command.Parameters.AddWithValue("$pointsBalance", pointsBalance.ToString(CultureInfo.InvariantCulture));
         command.Parameters.AddWithValue("$totalWatchMinutes", totalWatchMinutes);
         command.Parameters.AddWithValue("$updatedAtUtc", DateTimeOffset.UtcNow.UtcDateTime.ToString("O", CultureInfo.InvariantCulture));
@@ -725,5 +876,26 @@ public sealed class BridgeActionsTests : IDisposable
         command.Parameters.AddWithValue("$lastSeenUtc", DateTimeOffset.UtcNow.UtcDateTime.ToString("O", CultureInfo.InvariantCulture));
         command.Parameters.AddWithValue("$presenceExpiresAtUtc", DateTimeOffset.UtcNow.AddMinutes(5).UtcDateTime.ToString("O", CultureInfo.InvariantCulture));
         command.ExecuteNonQuery();
+    }
+
+    private decimal GetBalance(string normalizedUsername)
+    {
+        var databasePath = Path.Combine(installDirectory, "data", "twitch-heists.db");
+        using var connection = new SqliteConnection($@"Data Source={databasePath};Pooling=False");
+        connection.Open();
+
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT points_balance
+            FROM viewer_balances
+            WHERE normalized_username = $normalizedUsername;
+            """;
+        command.Parameters.AddWithValue("$normalizedUsername", normalizedUsername);
+        var scalar = command.ExecuteScalar();
+
+        return scalar is null || scalar is DBNull
+            ? 0m
+            : decimal.Parse((string)scalar, CultureInfo.InvariantCulture);
     }
 }

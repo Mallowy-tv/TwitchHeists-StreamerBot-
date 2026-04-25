@@ -7,10 +7,12 @@ namespace TwitchHeists.StreamerBot.Services;
 public sealed class RecordChatPresenceAction
 {
     private readonly ViewerRepository viewerRepository;
+    private readonly WatchStreakService? watchStreakService;
 
-    public RecordChatPresenceAction(ViewerRepository viewerRepository)
+    public RecordChatPresenceAction(ViewerRepository viewerRepository, WatchStreakService? watchStreakService = null)
     {
         this.viewerRepository = viewerRepository;
+        this.watchStreakService = watchStreakService;
     }
 
     public ActionResponseDto Execute(ChatPresenceDto chatPresence, DateTimeOffset nextRefreshBoundaryUtc)
@@ -33,6 +35,7 @@ public sealed class RecordChatPresenceAction
         };
 
         viewerRepository.StoreChatPresence(presenceRecord);
+        watchStreakService?.ApplySighting(presenceRecord.Identity, chatPresence.MessageReceivedAtUtc);
 
         return new ActionResponseDto
         {

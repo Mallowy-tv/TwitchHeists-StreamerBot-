@@ -1,4 +1,5 @@
 using System.Globalization;
+using TwitchHeists.Core.Models;
 using TwitchHeists.Data.Sqlite.Repositories;
 using TwitchHeists.StreamerBot.Contracts;
 
@@ -23,7 +24,7 @@ public sealed class AddPointsAction
         var normalizedTarget = NormalizeUsername(command.TargetUsername);
         if (string.Equals(normalizedTarget, "all", StringComparison.Ordinal))
         {
-            var activeViewers = viewerRepository.GetActiveNormalizedUsernames();
+            var activeViewers = viewerRepository.GetActiveViewerIdentities();
             if (activeViewers.Count == 0)
             {
                 return Failure("There are no active viewers to award points to.");
@@ -37,8 +38,9 @@ public sealed class AddPointsAction
             };
         }
 
-        viewerRepository.AddPoints(normalizedTarget, command.Amount, command.OccurredAtUtc);
-        var updatedBalance = viewerRepository.GetViewerBalance(normalizedTarget);
+        var targetViewer = CreateViewerIdentity(command.TargetTwitchUserId, command.TargetUsername, command.TargetDisplayName);
+        viewerRepository.AddPoints(targetViewer, command.Amount, command.OccurredAtUtc);
+        var updatedBalance = viewerRepository.GetViewerBalance(targetViewer);
         var targetName = string.IsNullOrWhiteSpace(command.TargetDisplayName) ? command.TargetUsername : command.TargetDisplayName;
 
         return new ActionResponseDto
@@ -60,5 +62,18 @@ public sealed class AddPointsAction
     private static string NormalizeUsername(string username)
     {
         return username.Trim().ToLowerInvariant();
+    }
+
+    private static ViewerIdentity CreateViewerIdentity(string? twitchUserId, string username, string? displayName)
+    {
+        var resolvedTwitchUserId = string.IsNullOrWhiteSpace(twitchUserId) ? null : twitchUserId!.Trim();
+
+        return new ViewerIdentity
+        {
+            TwitchUserId = resolvedTwitchUserId,
+            Username = username,
+            NormalizedUsername = NormalizeUsername(username),
+            DisplayName = displayName ?? username
+        };
     }
 }

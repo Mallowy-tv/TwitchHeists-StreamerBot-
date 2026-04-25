@@ -1,3 +1,4 @@
+using TwitchHeists.Core.Models;
 using TwitchHeists.Data.Sqlite.Repositories;
 using TwitchHeists.StreamerBot.Contracts;
 
@@ -20,8 +21,11 @@ public sealed class GetWatchtimeAction
         var targetDisplayName = string.IsNullOrWhiteSpace(query.TargetUsername)
             ? (string.IsNullOrWhiteSpace(query.RequesterDisplayName) ? query.RequesterUsername : query.RequesterDisplayName)
             : (string.IsNullOrWhiteSpace(query.TargetDisplayName) ? query.TargetUsername : query.TargetDisplayName);
-        var normalizedTarget = NormalizeUsername(targetUsername);
-        var totalWatchMinutes = viewerRepository.GetLifetimeWatchMinutes(normalizedTarget);
+        var targetViewer = CreateViewerIdentity(
+            string.IsNullOrWhiteSpace(query.TargetUsername) ? query.RequesterTwitchUserId : query.TargetTwitchUserId,
+            targetUsername,
+            targetDisplayName);
+        var totalWatchMinutes = viewerRepository.GetLifetimeWatchMinutes(targetViewer);
 
         return new ActionResponseDto
         {
@@ -43,5 +47,18 @@ public sealed class GetWatchtimeAction
     private static string NormalizeUsername(string username)
     {
         return username.Trim().ToLowerInvariant();
+    }
+
+    private static ViewerIdentity CreateViewerIdentity(string? twitchUserId, string username, string? displayName)
+    {
+        var resolvedTwitchUserId = string.IsNullOrWhiteSpace(twitchUserId) ? null : twitchUserId!.Trim();
+
+        return new ViewerIdentity
+        {
+            TwitchUserId = resolvedTwitchUserId,
+            Username = username,
+            NormalizedUsername = NormalizeUsername(username),
+            DisplayName = displayName ?? username
+        };
     }
 }

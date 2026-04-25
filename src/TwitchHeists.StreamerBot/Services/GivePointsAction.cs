@@ -1,4 +1,5 @@
 using System.Globalization;
+using TwitchHeists.Core.Models;
 using TwitchHeists.Data.Sqlite.Repositories;
 using TwitchHeists.StreamerBot.Contracts;
 
@@ -20,16 +21,16 @@ public sealed class GivePointsAction
             return Failure("Point amount must be greater than zero.");
         }
 
-        var normalizedSource = NormalizeUsername(command.SourceUsername);
-        var normalizedTarget = NormalizeUsername(command.TargetUsername);
-        if (string.Equals(normalizedSource, normalizedTarget, StringComparison.Ordinal))
+        var sourceViewer = CreateViewerIdentity(command.SourceTwitchUserId, command.SourceUsername, command.SourceDisplayName);
+        var targetViewer = CreateViewerIdentity(command.TargetTwitchUserId, command.TargetUsername, command.TargetDisplayName);
+        if (RepresentsSameViewer(sourceViewer, targetViewer))
         {
             return Failure("You cannot give points to yourself.");
         }
 
         try
         {
-            viewerRepository.TransferPoints(normalizedSource, normalizedTarget, command.Amount, command.OccurredAtUtc);
+            viewerRepository.TransferPoints(sourceViewer, targetViewer, command.Amount, command.OccurredAtUtc);
         }
         catch (InvalidOperationException exception)
         {
@@ -58,5 +59,29 @@ public sealed class GivePointsAction
     private static string NormalizeUsername(string username)
     {
         return username.Trim().ToLowerInvariant();
+    }
+
+    private static ViewerIdentity CreateViewerIdentity(string? twitchUserId, string username, string? displayName)
+    {
+        var resolvedTwitchUserId = string.IsNullOrWhiteSpace(twitchUserId) ? null : twitchUserId!.Trim();
+
+        return new ViewerIdentity
+        {
+            TwitchUserId = resolvedTwitchUserId,
+            Username = username,
+            NormalizedUsername = NormalizeUsername(username),
+            DisplayName = displayName ?? username
+        };
+    }
+
+    private static bool RepresentsSameViewer(ViewerIdentity sourceViewer, ViewerIdentity targetViewer)
+    {
+        if (!string.IsNullOrWhiteSpace(sourceViewer.TwitchUserId) &&
+            !string.IsNullOrWhiteSpace(targetViewer.TwitchUserId))
+        {
+            return string.Equals(sourceViewer.TwitchUserId, targetViewer.TwitchUserId, StringComparison.Ordinal);
+        }
+
+        return string.Equals(sourceViewer.NormalizedUsername, targetViewer.NormalizedUsername, StringComparison.Ordinal);
     }
 }

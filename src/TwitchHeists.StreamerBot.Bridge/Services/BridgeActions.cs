@@ -43,6 +43,20 @@ public sealed class BridgeActions
                 nextRefreshBoundaryUtc));
     }
 
+    public BridgeResult StartStream(string installDirectory, BridgeStreamLifecycleCommand command)
+    {
+        return Execute(
+            installDirectory,
+            () => runtimeFactory.CreateStartStreamAction(installDirectory).Execute(Map(command)));
+    }
+
+    public BridgeResult EndStream(string installDirectory, BridgeStreamLifecycleCommand command)
+    {
+        return Execute(
+            installDirectory,
+            () => runtimeFactory.CreateEndStreamAction(installDirectory).Execute(Map(command)));
+    }
+
     public BridgeResult AddPoints(string installDirectory, BridgePointsCommand command)
     {
         return Execute(
@@ -179,12 +193,22 @@ public sealed class BridgeActions
         };
     }
 
+    private static StreamLifecycleCommandDto Map(BridgeStreamLifecycleCommand command)
+    {
+        return new StreamLifecycleCommandDto
+        {
+            OccurredAtUtc = command.OccurredAtUtc
+        };
+    }
+
     private static PointsCommandDto Map(BridgePointsCommand command)
     {
         return new PointsCommandDto
         {
+            SourceTwitchUserId = command.SourceTwitchUserId,
             SourceUsername = command.SourceUsername,
             SourceDisplayName = command.SourceDisplayName,
+            TargetTwitchUserId = command.TargetTwitchUserId,
             TargetUsername = command.TargetUsername,
             TargetDisplayName = command.TargetDisplayName,
             Amount = command.Amount,
@@ -196,8 +220,10 @@ public sealed class BridgeActions
     {
         return new WatchtimeQueryDto
         {
+            RequesterTwitchUserId = query.RequesterTwitchUserId,
             RequesterUsername = query.RequesterUsername,
             RequesterDisplayName = query.RequesterDisplayName,
+            TargetTwitchUserId = query.TargetTwitchUserId,
             TargetUsername = query.TargetUsername,
             TargetDisplayName = query.TargetDisplayName,
             OccurredAtUtc = query.OccurredAtUtc

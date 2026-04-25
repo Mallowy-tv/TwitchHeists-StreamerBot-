@@ -187,6 +187,7 @@ public class CPHInline
         var snapshot = CreateArray(bridgeAssembly, "TwitchHeists.StreamerBot.Bridge.Models.BridgeCommunityViewer", 1);
         var viewer = CreateInstance(bridgeAssembly, "TwitchHeists.StreamerBot.Bridge.Models.BridgeCommunityViewer");
 
+        SetProperty(viewer, "TwitchUserId", "<viewer twitch user id>");
         SetProperty(viewer, "Username", "<viewer username>");
         SetProperty(viewer, "DisplayName", "<viewer display name>");
         SetProperty(viewer, "SubscriberTier", GetSubscriberTier());
@@ -1046,9 +1047,11 @@ public bool Execute()
     var bridgeActions = CreateBridgeActions(bridgeAssembly);
     var command = CreateInstance(bridgeAssembly, "TwitchHeists.StreamerBot.Bridge.Models.BridgePointsCommand");
     var targetUsername = GetResolvedTargetUsername(GetPointsTargetInputIndex());
+    var targetUserId = GetResolvedTargetUserId();
     var targetDisplayName = GetResolvedTargetDisplayName(targetUsername);
     var amount = GetRequiredDecimalArg(GetPointsAmountArgName());
 
+    SetProperty(command, "TargetTwitchUserId", targetUserId);
     SetProperty(command, "TargetUsername", targetUsername);
     SetProperty(command, "TargetDisplayName", targetDisplayName);
     SetProperty(command, "Amount", amount);
@@ -1145,6 +1148,11 @@ public bool Execute()
     {
         var displayName = GetOptionalStringArg("targetUser", "targetUserName");
         return string.IsNullOrWhiteSpace(displayName) ? fallbackUsername : displayName;
+    }
+
+    private string? GetResolvedTargetUserId()
+    {
+        return GetOptionalStringArg("targetUserId");
     }
 
     private decimal GetRequiredDecimalArg(string argName)
@@ -1244,9 +1252,11 @@ public bool Execute()
     var bridgeActions = CreateBridgeActions(bridgeAssembly);
     var command = CreateInstance(bridgeAssembly, "TwitchHeists.StreamerBot.Bridge.Models.BridgePointsCommand");
     var targetUsername = GetResolvedTargetUsername(GetPointsTargetInputIndex());
+    var targetUserId = GetResolvedTargetUserId();
     var targetDisplayName = GetResolvedTargetDisplayName(targetUsername);
     var amount = GetRequiredDecimalArg(GetPointsAmountArgName());
 
+    SetProperty(command, "TargetTwitchUserId", targetUserId);
     SetProperty(command, "TargetUsername", targetUsername);
     SetProperty(command, "TargetDisplayName", targetDisplayName);
     SetProperty(command, "Amount", amount);
@@ -1345,6 +1355,11 @@ public bool Execute()
         return string.IsNullOrWhiteSpace(displayName) ? fallbackUsername : displayName;
     }
 
+    private string? GetResolvedTargetUserId()
+    {
+        return GetOptionalStringArg("targetUserId");
+    }
+
     private decimal GetRequiredDecimalArg(string argName)
     {
         var rawValue = GetRequiredStringArg(argName);
@@ -1441,14 +1456,18 @@ public bool Execute()
     var bridgeAssembly = LoadBridgeAssembly();
     var bridgeActions = CreateBridgeActions(bridgeAssembly);
     var command = CreateInstance(bridgeAssembly, "TwitchHeists.StreamerBot.Bridge.Models.BridgePointsCommand");
+    var sourceUserId = GetSenderUserId();
     var sourceUsername = GetSenderUsername();
     var sourceDisplayName = GetSenderDisplayName(sourceUsername);
     var targetUsername = GetResolvedTargetUsername(GetPointsTargetInputIndex());
+    var targetUserId = GetResolvedTargetUserId();
     var targetDisplayName = GetResolvedTargetDisplayName(targetUsername);
     var amount = GetRequiredDecimalArg(GetPointsAmountArgName());
 
+    SetProperty(command, "SourceTwitchUserId", sourceUserId);
     SetProperty(command, "SourceUsername", sourceUsername);
     SetProperty(command, "SourceDisplayName", sourceDisplayName);
+    SetProperty(command, "TargetTwitchUserId", targetUserId);
     SetProperty(command, "TargetUsername", targetUsername);
     SetProperty(command, "TargetDisplayName", targetDisplayName);
     SetProperty(command, "Amount", amount);
@@ -1546,6 +1565,11 @@ public bool Execute()
         return string.IsNullOrWhiteSpace(displayName) ? fallbackUsername : displayName;
     }
 
+    private string? GetSenderUserId()
+    {
+        return GetOptionalStringArg("userId");
+    }
+
     private string GetResolvedTargetUsername(int inputIndex)
     {
         var username = GetOptionalStringArg("targetUserName", "targetUserName", "input" + inputIndex);
@@ -1562,6 +1586,11 @@ public bool Execute()
     {
         var displayName = GetOptionalStringArg("targetUser", "targetUserName");
         return string.IsNullOrWhiteSpace(displayName) ? fallbackUsername : displayName;
+    }
+
+    private string? GetResolvedTargetUserId()
+    {
+        return GetOptionalStringArg("targetUserId");
     }
 
     private decimal GetRequiredDecimalArg(string argName)
@@ -1657,15 +1686,19 @@ public bool Execute()
     var bridgeAssembly = LoadBridgeAssembly();
     var bridgeActions = CreateBridgeActions(bridgeAssembly);
     var query = CreateInstance(bridgeAssembly, "TwitchHeists.StreamerBot.Bridge.Models.BridgeWatchtimeQuery");
+    var requesterUserId = GetSenderUserId();
     var requesterUsername = GetSenderUsername();
     var requesterDisplayName = GetSenderDisplayName(requesterUsername);
+    var targetUserId = GetOptionalStringArg("targetUserId");
     var targetUsername = GetOptionalStringArg("targetUserName", "input0");
     var targetDisplayName = string.IsNullOrWhiteSpace(targetUsername)
         ? null
         : GetResolvedTargetDisplayName(targetUsername);
 
+    SetProperty(query, "RequesterTwitchUserId", requesterUserId);
     SetProperty(query, "RequesterUsername", requesterUsername);
     SetProperty(query, "RequesterDisplayName", requesterDisplayName);
+    SetProperty(query, "TargetTwitchUserId", targetUserId);
     SetProperty(query, "TargetUsername", targetUsername);
     SetProperty(query, "TargetDisplayName", targetDisplayName);
     SetProperty(query, "OccurredAtUtc", DateTimeOffset.UtcNow);
@@ -1762,6 +1795,11 @@ public bool Execute()
         return string.IsNullOrWhiteSpace(displayName) ? fallbackUsername : displayName;
     }
 
+    private string? GetSenderUserId()
+    {
+        return GetOptionalStringArg("userId");
+    }
+
     private string GetResolvedTargetDisplayName(string fallbackUsername)
     {
         var displayName = GetOptionalStringArg("targetUser", "targetUserName");
@@ -1784,13 +1822,207 @@ public bool Execute()
 }
 ```
 
+### Action 2b: Stream start
+
+Run this on your **stream online / go-live trigger**.
+
+This action only logs to Streamer.bot. It does **not** send a chat message.
+
+```csharp
+using System;
+using System.IO;
+using System.Reflection;
+
+public class CPHInline
+{
+    private const string InstallDir = @"D:\Streamer Bot\Extensions\TwitchHeist";
+    private static bool resolverRegistered;
+
+    public bool Execute()
+    {
+        RegisterAssemblyResolver();
+        var bridgeAssembly = LoadBridgeAssembly();
+        var bridgeActions = CreateBridgeActions(bridgeAssembly);
+        var command = CreateInstance(bridgeAssembly, "TwitchHeists.StreamerBot.Bridge.Models.BridgeStreamLifecycleCommand");
+
+        SetProperty(command, "OccurredAtUtc", DateTimeOffset.UtcNow);
+
+        var result = InvokeBridge(bridgeActions, "StartStream", InstallDir, command);
+        var message = GetStringProperty(result, "Message");
+
+        CPH.LogInfo("[TwitchHeists][StreamStart] " + message);
+        return true;
+    }
+
+    private static void RegisterAssemblyResolver()
+    {
+        if (resolverRegistered)
+        {
+            return;
+        }
+
+        AppDomain.CurrentDomain.AssemblyResolve += ResolveFromInstallDir;
+        resolverRegistered = true;
+    }
+
+    private static Assembly ResolveFromInstallDir(object sender, ResolveEventArgs args)
+    {
+        var assemblyName = new AssemblyName(args.Name).Name + ".dll";
+        var assemblyPath = Path.Combine(InstallDir, assemblyName);
+
+        if (File.Exists(assemblyPath))
+        {
+            return Assembly.LoadFrom(assemblyPath);
+        }
+
+        return null;
+    }
+
+    private static Assembly LoadBridgeAssembly()
+    {
+        var bridgePath = Path.Combine(InstallDir, "TwitchHeists.StreamerBot.Bridge.dll");
+        if (!File.Exists(bridgePath))
+        {
+            throw new FileNotFoundException("Bridge DLL not found.", bridgePath);
+        }
+
+        return Assembly.LoadFrom(bridgePath);
+    }
+
+    private static object CreateBridgeActions(Assembly bridgeAssembly)
+    {
+        var bridgeActionsType = bridgeAssembly.GetType("TwitchHeists.StreamerBot.Bridge.Services.BridgeActions", true);
+        return Activator.CreateInstance(bridgeActionsType);
+    }
+
+    private static object CreateInstance(Assembly bridgeAssembly, string typeName)
+    {
+        var type = bridgeAssembly.GetType(typeName, true);
+        return Activator.CreateInstance(type);
+    }
+
+    private static void SetProperty(object target, string propertyName, object value)
+    {
+        target.GetType().GetProperty(propertyName).SetValue(target, value, null);
+    }
+
+    private static object InvokeBridge(object bridgeActions, string methodName, params object[] arguments)
+    {
+        return bridgeActions.GetType().GetMethod(methodName).Invoke(bridgeActions, arguments);
+    }
+
+    private static string GetStringProperty(object target, string propertyName)
+    {
+        var value = target.GetType().GetProperty(propertyName).GetValue(target, null);
+        return value == null ? string.Empty : value.ToString();
+    }
+}
+```
+
+### Action 2c: Stream end
+
+Run this on your **stream offline / end trigger**.
+
+This action only logs to Streamer.bot. It does **not** send a chat message.
+
+```csharp
+using System;
+using System.IO;
+using System.Reflection;
+
+public class CPHInline
+{
+    private const string InstallDir = @"D:\Streamer Bot\Extensions\TwitchHeist";
+    private static bool resolverRegistered;
+
+    public bool Execute()
+    {
+        RegisterAssemblyResolver();
+        var bridgeAssembly = LoadBridgeAssembly();
+        var bridgeActions = CreateBridgeActions(bridgeAssembly);
+        var command = CreateInstance(bridgeAssembly, "TwitchHeists.StreamerBot.Bridge.Models.BridgeStreamLifecycleCommand");
+
+        SetProperty(command, "OccurredAtUtc", DateTimeOffset.UtcNow);
+
+        var result = InvokeBridge(bridgeActions, "EndStream", InstallDir, command);
+        var message = GetStringProperty(result, "Message");
+
+        CPH.LogInfo("[TwitchHeists][StreamEnd] " + message);
+        return true;
+    }
+
+    private static void RegisterAssemblyResolver()
+    {
+        if (resolverRegistered)
+        {
+            return;
+        }
+
+        AppDomain.CurrentDomain.AssemblyResolve += ResolveFromInstallDir;
+        resolverRegistered = true;
+    }
+
+    private static Assembly ResolveFromInstallDir(object sender, ResolveEventArgs args)
+    {
+        var assemblyName = new AssemblyName(args.Name).Name + ".dll";
+        var assemblyPath = Path.Combine(InstallDir, assemblyName);
+
+        if (File.Exists(assemblyPath))
+        {
+            return Assembly.LoadFrom(assemblyPath);
+        }
+
+        return null;
+    }
+
+    private static Assembly LoadBridgeAssembly()
+    {
+        var bridgePath = Path.Combine(InstallDir, "TwitchHeists.StreamerBot.Bridge.dll");
+        if (!File.Exists(bridgePath))
+        {
+            throw new FileNotFoundException("Bridge DLL not found.", bridgePath);
+        }
+
+        return Assembly.LoadFrom(bridgePath);
+    }
+
+    private static object CreateBridgeActions(Assembly bridgeAssembly)
+    {
+        var bridgeActionsType = bridgeAssembly.GetType("TwitchHeists.StreamerBot.Bridge.Services.BridgeActions", true);
+        return Activator.CreateInstance(bridgeActionsType);
+    }
+
+    private static object CreateInstance(Assembly bridgeAssembly, string typeName)
+    {
+        var type = bridgeAssembly.GetType(typeName, true);
+        return Activator.CreateInstance(type);
+    }
+
+    private static void SetProperty(object target, string propertyName, object value)
+    {
+        target.GetType().GetProperty(propertyName).SetValue(target, value, null);
+    }
+
+    private static object InvokeBridge(object bridgeActions, string methodName, params object[] arguments)
+    {
+        return bridgeActions.GetType().GetMethod(methodName).Invoke(bridgeActions, arguments);
+    }
+
+    private static string GetStringProperty(object target, string propertyName)
+    {
+        var value = target.GetType().GetProperty(propertyName).GetValue(target, null);
+        return value == null ? string.Empty : value.ToString();
+    }
+}
+```
+
 ## 7. Result handling
 
 The reflection loader still returns the bridge result object at runtime. The snippets above read `result.Message` with reflection and then:
 
 - log it in every action;
 - send it to chat for `!heist`, `!join`, resolved heists, points commands, and `!watchtime`;
-- avoid sending the `chatPresence` result to chat so you do not spam every message.
+- avoid sending the `chatPresence`, `StartStream`, and `EndStream` results to chat so you do not spam every message.
 
 ## 8. Recommended trigger map
 
@@ -1798,6 +2030,8 @@ The reflection loader still returns the bridge result object at runtime. The sni
 |---|---|
 | 5-minute timer | `RefreshCommunityViewers` |
 | Chat message | `RecordChatPresence` |
+| Stream online / go-live trigger | `StartStream` |
+| Stream offline / end trigger | `EndStream` |
 | Command `!heist` | `StartHeist` |
 | Command `!join` | `JoinHeist` |
 | 10-30 second timer | `ResolveDueHeists` |
@@ -1805,6 +2039,10 @@ The reflection loader still returns the bridge result object at runtime. The sni
 | Command `!points remove` (mods only) | `RemovePoints` |
 | Command `!points give` | `GivePoints` |
 | Command `!watchtime` | `GetWatchtime` |
+
+Use the `userId` chat arg for the sender and the `targetUserId` value from **Get User Info for Target** wherever those values are available. TwitchHeists now treats Twitch user ID as the stable identity for balances, watchtime, and heist ownership, while still falling back to usernames for older rows and commands.
+
+Watch streaks are silent. They do not send chat output when a viewer qualifies. Instead, the first time a viewer is seen during an active stream, TwitchHeists awards `100 * streak` points in the background. Missing the previous completed stream resets the next qualifying stream back to streak `1`.
 
 ## 9. First-run checklist
 
@@ -1821,6 +2059,7 @@ The reflection loader still returns the bridge result object at runtime. The sni
 11. Your `!points add` and `!points remove` command permissions are restricted to moderators.
 12. Your target-based commands add **Get User Info for Target** before Execute C# so `targetUserName`, `targetUser`, and `targetUserId` are available.
 13. Your chat and community snippets pass a real subscriber tier instead of leaving `SubscriberTier` hardcoded to `0`.
+14. Your Streamer.bot workflow fires `StartStream` when you go live and `EndStream` when the stream ends.
 
 ## 10. Operational notes
 
