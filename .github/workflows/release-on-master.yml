@@ -22,10 +22,10 @@ jobs:
           dotnet-version: 9.0.x
 
       - name: Test
-        run: dotnet test .\TwitchHeists.sln
+        run: dotnet test .\tests\TwitchHeists.Tests\TwitchHeists.Tests.csproj
 
       - name: Build Release
-        run: dotnet build .\TwitchHeists.sln -c Release --no-restore
+        run: dotnet build .\src\TwitchHeists.StreamerBot.Bridge\TwitchHeists.StreamerBot.Bridge.csproj -c Release
 
       - name: Package bridge output
         shell: pwsh
