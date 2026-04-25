@@ -21,6 +21,12 @@ public sealed class HeistSettings
 
     public int MinimumPlayers { get; set; } = 2;
 
+    public int MinimumParticipants
+    {
+        get => MinimumPlayers;
+        set => MinimumPlayers = value;
+    }
+
     public int MaximumWinnerCount { get; set; } = 5;
 
     public List<HeistWinnerBand> WinnerBands { get; set; } = CreateDefaultWinnerBands();

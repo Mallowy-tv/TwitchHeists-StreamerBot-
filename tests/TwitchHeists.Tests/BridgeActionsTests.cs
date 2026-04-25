@@ -270,7 +270,7 @@ public sealed class BridgeActionsTests : IDisposable
     public void StartHeist_UsesCustomTemplateFileForCooldownMessage()
     {
         EnsureInstallDirectory(
-            configurationJson: BuildHeistConfigurationJson(1.0m, 1.0m, minimumPlayers: 1),
+            configurationJson: BuildHeistConfigurationJson(1.0m, 1.0m, minimumParticipants: 1),
             messageTemplatesJson:
             """
             {
@@ -422,7 +422,7 @@ public sealed class BridgeActionsTests : IDisposable
     public void ResolveDueHeists_UsesCustomTemplateFileForSuccessResult()
     {
         EnsureInstallDirectory(
-            configurationJson: BuildHeistConfigurationJson(1.0m, 1.0m, minimumPlayers: 1),
+            configurationJson: BuildHeistConfigurationJson(1.0m, 1.0m, minimumParticipants: 1),
             messageTemplatesJson:
             """
             {
@@ -479,7 +479,7 @@ public sealed class BridgeActionsTests : IDisposable
     public void ResolveDueHeists_UsesCustomTemplateFileForFailureResult()
     {
         EnsureInstallDirectory(
-            configurationJson: BuildHeistConfigurationJson(0.0m, 0.0m, minimumPlayers: 1),
+            configurationJson: BuildHeistConfigurationJson(0.0m, 0.0m, minimumParticipants: 1),
             messageTemplatesJson:
             """
             {
@@ -533,10 +533,10 @@ public sealed class BridgeActionsTests : IDisposable
     }
 
     [Fact]
-    public void ResolveDueHeists_UsesCustomTemplateFileForInsufficientCrewResultsAndLoadsMinimumPlayers()
+    public void ResolveDueHeists_UsesCustomTemplateFileForInsufficientCrewResultsAndLoadsMinimumParticipants()
     {
         EnsureInstallDirectory(
-            configurationJson: BuildHeistConfigurationJson(1.0m, 1.0m, minimumPlayers: 3),
+            configurationJson: BuildHeistConfigurationJson(1.0m, 1.0m, minimumParticipants: 3),
             messageTemplatesJson:
             """
             {
@@ -608,7 +608,7 @@ public sealed class BridgeActionsTests : IDisposable
     public void ResolveDueHeists_UsesConfiguredMaximumNamedCalloutsForLargeCrews()
     {
         EnsureInstallDirectory(
-            configurationJson: BuildHeistConfigurationJson(1.0m, 1.0m, minimumPlayers: 2, maximumNamedResolutionCallouts: 1),
+            configurationJson: BuildHeistConfigurationJson(1.0m, 1.0m, minimumParticipants: 2, maximumNamedResolutionCallouts: 1),
             messageTemplatesJson:
             """
             {
@@ -911,7 +911,7 @@ public sealed class BridgeActionsTests : IDisposable
     private static string BuildHeistConfigurationJson(
         decimal minimumSuccessChance,
         decimal maximumSuccessChance,
-        int minimumPlayers = 2,
+        int minimumParticipants = 2,
         int maximumNamedResolutionCallouts = 2)
     {
         return
@@ -925,7 +925,7 @@ public sealed class BridgeActionsTests : IDisposable
                 "TenSecondReminderThreshold": "00:00:10",
                 "MinimumSuccessChance": {{minimumSuccessChance.ToString(CultureInfo.InvariantCulture)}},
                 "MaximumSuccessChance": {{maximumSuccessChance.ToString(CultureInfo.InvariantCulture)}},
-                "MinimumPlayers": {{minimumPlayers}},
+                "MinimumParticipants": {{minimumParticipants}},
                 "MaximumWinnerCount": 5,
                 "MaximumNamedResolutionCallouts": {{maximumNamedResolutionCallouts}},
                 "SuccessfulPotMultiplier": 2.0

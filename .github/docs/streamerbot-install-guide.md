@@ -82,15 +82,14 @@ You can also tune these values before first use:
 | `Heist.TenSecondReminderThreshold` | `00:00:10` | When to send the 10-second countdown reminder |
 | `Heist.MinimumSuccessChance` | `0.4` | Lowest allowed success chance |
 | `Heist.MaximumSuccessChance` | `0.75` | Highest allowed success chance |
-| `Heist.MinimumPlayers` | `2` | Minimum joined crew size before a heist can resolve normally |
+| `Heist.MinimumParticipants` | `2` | Minimum joined crew size before a heist can resolve normally |
 | `Heist.WinnerBands` | built-in defaults | Adaptive winner ranges keyed by joined player count |
 | `Heist.MaximumNamedResolutionCallouts` | `2` | Max named callouts before the result falls back to summary-only text |
-| `Heist.MaximumWinnerCount` | `5` | Fallback cap only if no winner band applies |
 | `Heist.SuccessfulPotMultiplier` | `2.0` | Pot multiplier on success |
 
 `heist-messages.json` sits beside `appsettings.json` in the same install folder and controls all heist chat output without rebuilding the project.
 
-By default, crews below `Heist.MinimumPlayers` resolve through the insufficient-crew path and get their reserved stakes refunded. Larger crews use the built-in adaptive winner bands instead of a fixed winner count.
+By default, crews below `Heist.MinimumParticipants` resolve through the insufficient-crew path and get their reserved stakes refunded. Larger crews use the built-in adaptive winner bands instead of a fixed winner count.
 
 Supported message groups:
 
@@ -2075,7 +2074,7 @@ Watch streaks are silent. They do not send chat output when a viewer qualifies. 
 2. Chat-only presence expires at the next refresh boundary if the viewer never appears in the Community snapshot.
 3. Heist points are reserved when a user starts or joins a round.
 4. On failure, reserved points stay lost.
-5. Crews below `Heist.MinimumPlayers` are refunded instead of being forced into a normal resolution.
+5. Crews below `Heist.MinimumParticipants` are refunded instead of being forced into a normal resolution.
 6. On success, the pot is doubled and split across an adaptive winner count from the configured winner bands.
 7. Large heist result messages stay compact and respect `Heist.MaximumNamedResolutionCallouts`.
 8. `!points remove` clamps the target balance to zero instead of allowing negative balances.

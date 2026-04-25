@@ -114,7 +114,7 @@ All bridge methods return a `BridgeResult` with `Success`, `Message`, `RewardedV
 - If a viewer missed the previous completed stream, their next qualifying sighting restarts the streak at `1` instead of continuing the old chain.
 - Heist stake reservations and resolutions run inside transactions so points and round state stay aligned.
 - `!heist` opens a 2-minute join window, sends 1m / 30s / 10s countdown reminders through the heist timer action, and enforces a 5-minute cooldown after results.
-- Heists with fewer than `MinimumPlayers` resolve as **not enough crew** and refund every joined stake instead of forcing a win or loss.
+- Heists with fewer than `MinimumParticipants` resolve as **not enough crew** and refund every joined stake instead of forcing a win or loss.
 - Successful heists now choose a winner count from the configured adaptive winner bands instead of always using a fixed cap.
 - Resolved heist messages stay summary-first and only use a small number of named callouts, controlled by `MaximumNamedResolutionCallouts`.
 - `heist-messages.json` drives every heist chat line with placeholder tokens such as `{starter}`, `{stake}`, `{joinWindow}`, `{cooldownRemaining}`, `{countdown}`, `{pot}`, `{participantCount}`, `{winner}`, `{loser}`, `{payout}`, `{winnerCount}`, `{loserCount}`, `{resolvedPot}`, and `{successChancePercent}`. The new `insufficientCrewMessages` group uses the same token set, especially `{participantCount}` and `{resolvedPot}`.
