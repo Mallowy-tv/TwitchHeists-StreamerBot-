@@ -21,6 +21,22 @@ public sealed class RemovePointsAction
         }
 
         var normalizedTarget = NormalizeUsername(command.TargetUsername);
+        if (string.Equals(normalizedTarget, "all", StringComparison.Ordinal))
+        {
+            var activeViewers = viewerRepository.GetActiveNormalizedUsernames();
+            if (activeViewers.Count == 0)
+            {
+                return Failure("There are no active viewers to remove points from.");
+            }
+
+            var updatedCount = viewerRepository.RemovePoints(activeViewers, command.Amount, command.OccurredAtUtc);
+            return new ActionResponseDto
+            {
+                Success = true,
+                Message = $"{updatedCount} active viewers each lost {command.Amount.ToString("0.##", CultureInfo.InvariantCulture)} points."
+            };
+        }
+
         viewerRepository.RemovePoints(normalizedTarget, command.Amount, command.OccurredAtUtc);
         var updatedBalance = viewerRepository.GetViewerBalance(normalizedTarget);
         var targetName = string.IsNullOrWhiteSpace(command.TargetDisplayName) ? command.TargetUsername : command.TargetDisplayName;

@@ -1,5 +1,6 @@
 using System.Globalization;
 using Microsoft.Data.Sqlite;
+using TwitchHeists.Core.Models;
 using TwitchHeists.Data.Sqlite.Schema;
 using TwitchHeists.StreamerBot.Bridge.Models;
 using TwitchHeists.StreamerBot.Bridge.Services;
@@ -126,6 +127,52 @@ public sealed class BridgeActionsTests : IDisposable
     }
 
     [Fact]
+    public void AddPoints_AllReturnsActiveViewerSummary()
+    {
+        EnsureInstallDirectory();
+        SeedActivePresence("viewerone", "ViewerOne");
+        SeedActivePresence("viewertwo", "ViewerTwo");
+        var actions = new BridgeActions();
+
+        var result = actions.AddPoints(
+            installDirectory,
+            new BridgePointsCommand
+            {
+                TargetUsername = "all",
+                Amount = 500m,
+                OccurredAtUtc = new DateTimeOffset(2026, 4, 25, 16, 0, 0, TimeSpan.Zero)
+            });
+
+        Assert.True(result.Success);
+        Assert.Contains("2 active viewers", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Balance is now", result.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void RemovePoints_AllReturnsActiveViewerSummary()
+    {
+        EnsureInstallDirectory();
+        SeedBalance("viewerone", 700m, 0);
+        SeedBalance("viewertwo", 300m, 0);
+        SeedActivePresence("viewerone", "ViewerOne");
+        SeedActivePresence("viewertwo", "ViewerTwo");
+        var actions = new BridgeActions();
+
+        var result = actions.RemovePoints(
+            installDirectory,
+            new BridgePointsCommand
+            {
+                TargetUsername = "all",
+                Amount = 500m,
+                OccurredAtUtc = new DateTimeOffset(2026, 4, 25, 16, 0, 0, TimeSpan.Zero)
+            });
+
+        Assert.True(result.Success);
+        Assert.Contains("2 active viewers", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Balance is now", result.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void GivePoints_ReturnsFriendlyFailureWhenSenderLacksFunds()
     {
         EnsureInstallDirectory();
@@ -213,6 +260,65 @@ public sealed class BridgeActionsTests : IDisposable
         command.Parameters.AddWithValue("$pointsBalance", pointsBalance.ToString(CultureInfo.InvariantCulture));
         command.Parameters.AddWithValue("$totalWatchMinutes", totalWatchMinutes);
         command.Parameters.AddWithValue("$updatedAtUtc", DateTimeOffset.UtcNow.UtcDateTime.ToString("O", CultureInfo.InvariantCulture));
+        command.ExecuteNonQuery();
+    }
+
+    private void SeedActivePresence(string normalizedUsername, string displayName)
+    {
+        var databasePath = Path.Combine(installDirectory, "data", "twitch-heists.db");
+        using var connection = new SqliteConnection($@"Data Source={databasePath};Pooling=False");
+        connection.Open();
+        new SchemaBootstrapper().EnsureCreated(connection);
+
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            INSERT INTO viewer_presence (
+                normalized_username,
+                twitch_user_id,
+                username,
+                display_name,
+                presence_source,
+                subscriber_tier,
+                is_active,
+                active_since_utc,
+                last_seen_utc,
+                last_confirmed_refresh_utc,
+                last_rewarded_cycle_utc,
+                presence_expires_at_utc
+            )
+            VALUES (
+                $normalizedUsername,
+                NULL,
+                $username,
+                $displayName,
+                $presenceSource,
+                $subscriberTier,
+                1,
+                $activeSinceUtc,
+                $lastSeenUtc,
+                NULL,
+                NULL,
+                $presenceExpiresAtUtc
+            )
+            ON CONFLICT(normalized_username) DO UPDATE SET
+                username = excluded.username,
+                display_name = excluded.display_name,
+                presence_source = excluded.presence_source,
+                subscriber_tier = excluded.subscriber_tier,
+                is_active = 1,
+                active_since_utc = excluded.active_since_utc,
+                last_seen_utc = excluded.last_seen_utc,
+                presence_expires_at_utc = excluded.presence_expires_at_utc;
+            """;
+        command.Parameters.AddWithValue("$normalizedUsername", normalizedUsername);
+        command.Parameters.AddWithValue("$username", normalizedUsername);
+        command.Parameters.AddWithValue("$displayName", displayName);
+        command.Parameters.AddWithValue("$presenceSource", (int)PresenceSource.ChatFallback);
+        command.Parameters.AddWithValue("$subscriberTier", (int)TwitchSubscriberTier.None);
+        command.Parameters.AddWithValue("$activeSinceUtc", DateTimeOffset.UtcNow.AddMinutes(-5).UtcDateTime.ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$lastSeenUtc", DateTimeOffset.UtcNow.UtcDateTime.ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$presenceExpiresAtUtc", DateTimeOffset.UtcNow.AddMinutes(5).UtcDateTime.ToString("O", CultureInfo.InvariantCulture));
         command.ExecuteNonQuery();
     }
 }

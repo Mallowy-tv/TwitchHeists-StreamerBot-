@@ -1,5 +1,6 @@
 using System.Globalization;
 using Microsoft.Data.Sqlite;
+using TwitchHeists.Core.Models;
 using TwitchHeists.Data.Sqlite.Repositories;
 using TwitchHeists.Data.Sqlite.Schema;
 using TwitchHeists.StreamerBot.Contracts;
@@ -98,6 +99,86 @@ public sealed class PointsActionsTests : IDisposable
         Assert.Equal(250m, repository.GetViewerBalance("target"));
     }
 
+    [Fact]
+    public void AddPointsAction_AddsPointsToEveryActiveViewerWhenTargetIsAll()
+    {
+        SeedActivePresence("viewerone", "ViewerOne");
+        SeedActivePresence("viewertwo", "ViewerTwo");
+        var repository = CreateRepository();
+        var action = new AddPointsAction(repository);
+
+        var result = action.Execute(new PointsCommandDto
+        {
+            TargetUsername = "all",
+            Amount = 500m,
+            OccurredAtUtc = new DateTimeOffset(2026, 4, 25, 16, 0, 0, TimeSpan.Zero)
+        });
+
+        Assert.True(result.Success);
+        Assert.Equal(500m, repository.GetViewerBalance("viewerone"));
+        Assert.Equal(500m, repository.GetViewerBalance("viewertwo"));
+        Assert.Contains("2 active viewers", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Balance is now", result.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void RemovePointsAction_RemovesPointsFromEveryActiveViewerWhenTargetIsAll()
+    {
+        SeedBalance("viewerone", 700m);
+        SeedBalance("viewertwo", 300m);
+        SeedActivePresence("viewerone", "ViewerOne");
+        SeedActivePresence("viewertwo", "ViewerTwo");
+        var repository = CreateRepository();
+        var action = new RemovePointsAction(repository);
+
+        var result = action.Execute(new PointsCommandDto
+        {
+            TargetUsername = "all",
+            Amount = 500m,
+            OccurredAtUtc = new DateTimeOffset(2026, 4, 25, 16, 0, 0, TimeSpan.Zero)
+        });
+
+        Assert.True(result.Success);
+        Assert.Equal(200m, repository.GetViewerBalance("viewerone"));
+        Assert.Equal(0m, repository.GetViewerBalance("viewertwo"));
+        Assert.Contains("2 active viewers", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Balance is now", result.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void AddPointsAction_FailsWhenAllIsUsedWithoutActiveViewers()
+    {
+        var repository = CreateRepository();
+        var action = new AddPointsAction(repository);
+
+        var result = action.Execute(new PointsCommandDto
+        {
+            TargetUsername = "all",
+            Amount = 500m,
+            OccurredAtUtc = new DateTimeOffset(2026, 4, 25, 16, 0, 0, TimeSpan.Zero)
+        });
+
+        Assert.False(result.Success);
+        Assert.Contains("active viewers", result.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void RemovePointsAction_FailsWhenAllIsUsedWithoutActiveViewers()
+    {
+        var repository = CreateRepository();
+        var action = new RemovePointsAction(repository);
+
+        var result = action.Execute(new PointsCommandDto
+        {
+            TargetUsername = "all",
+            Amount = 500m,
+            OccurredAtUtc = new DateTimeOffset(2026, 4, 25, 16, 0, 0, TimeSpan.Zero)
+        });
+
+        Assert.False(result.Success);
+        Assert.Contains("active viewers", result.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     public void Dispose()
     {
         if (File.Exists(databasePath))
@@ -142,5 +223,24 @@ public sealed class PointsActionsTests : IDisposable
         command.Parameters.AddWithValue("$totalWatchMinutes", totalWatchMinutes);
         command.Parameters.AddWithValue("$updatedAtUtc", DateTimeOffset.UtcNow.UtcDateTime.ToString("O", CultureInfo.InvariantCulture));
         command.ExecuteNonQuery();
+    }
+
+    private void SeedActivePresence(string normalizedUsername, string displayName)
+    {
+        var repository = CreateRepository();
+        repository.StoreChatPresence(new ViewerPresenceRecord
+        {
+            Identity = new ViewerIdentity
+            {
+                Username = normalizedUsername,
+                NormalizedUsername = normalizedUsername,
+                DisplayName = displayName
+            },
+            ActiveSinceUtc = DateTimeOffset.UtcNow.AddMinutes(-5),
+            LastSeenUtc = DateTimeOffset.UtcNow,
+            PresenceSource = PresenceSource.ChatFallback,
+            SubscriberTier = TwitchSubscriberTier.None,
+            PresenceExpiresAtUtc = DateTimeOffset.UtcNow.AddMinutes(5)
+        });
     }
 }

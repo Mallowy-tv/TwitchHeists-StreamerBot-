@@ -1,6 +1,6 @@
 # TwitchHeists
 
-TwitchHeists is a Streamer.bot integration that tracks watchtime, awards points with subscriber multipliers, supports balance commands, and runs Twitch heists against a local SQLite database.
+TwitchHeists is a Streamer.bot integration that tracks watchtime, awards points with subscriber multipliers, supports balance commands including bulk mod adjustments for active viewers, and runs Twitch heists against a local SQLite database.
 
 For the Streamer.bot install flow, use `.github\docs\streamerbot-install-guide.md`.
 
@@ -84,4 +84,5 @@ All bridge methods return a `BridgeResult` with `Success`, `Message`, `RewardedV
 - Chat-only presence expires at the next refresh boundary if the viewer never appears in the Community snapshot.
 - Heist stake reservations and resolutions run inside transactions so points and round state stay aligned.
 - `!points give` transfers existing balance from the sender to the target; it does not mint new points.
+- `!points add all` and `!points remove all` target viewers currently marked active in TwitchHeists presence tracking.
 - `!watchtime` reads lifetime rewarded watch minutes from the same SQLite balance store.

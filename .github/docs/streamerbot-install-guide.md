@@ -921,9 +921,21 @@ Set the Streamer.bot command permissions so only moderators can trigger it.
 
 Add a **Get User Info for Target** sub-action before this Execute C# step with **User Login** = `%input0%` for a dedicated `!points add` command, or `%input1%` for a shared `!points` command.
 
-Use the same helper members from **Action 2** and replace only the `Execute()` method with this body:
+If the literal target is `all`, skip the target lookup sub-action. `!points add all <amount>` awards that amount to every viewer currently active in TwitchHeists presence tracking and returns a summary message instead of per-user balances.
+
+This is a **full standalone `CPHInline` class**. Copy the entire block exactly as shown.
 
 ```csharp
+using System;
+using System.Globalization;
+using System.IO;
+using System.Reflection;
+
+public class CPHInline
+{
+    private const string InstallDir = @"D:\Streamer Bot\Extensions\TwitchHeist";
+    private static bool resolverRegistered;
+
 public bool Execute()
 {
     RegisterAssemblyResolver();
@@ -950,6 +962,153 @@ public bool Execute()
     CPH.LogInfo(message);
     return true;
 }
+
+    private static void RegisterAssemblyResolver()
+    {
+        if (resolverRegistered)
+        {
+            return;
+        }
+
+        AppDomain.CurrentDomain.AssemblyResolve += ResolveFromInstallDir;
+        resolverRegistered = true;
+    }
+
+    private static Assembly ResolveFromInstallDir(object sender, ResolveEventArgs args)
+    {
+        var assemblyName = new AssemblyName(args.Name).Name + ".dll";
+        var assemblyPath = Path.Combine(InstallDir, assemblyName);
+
+        if (File.Exists(assemblyPath))
+        {
+            return Assembly.LoadFrom(assemblyPath);
+        }
+
+        return null;
+    }
+
+    private static Assembly LoadBridgeAssembly()
+    {
+        var bridgePath = Path.Combine(InstallDir, "TwitchHeists.StreamerBot.Bridge.dll");
+        if (!File.Exists(bridgePath))
+        {
+            throw new FileNotFoundException("Bridge DLL not found.", bridgePath);
+        }
+
+        return Assembly.LoadFrom(bridgePath);
+    }
+
+    private static object CreateBridgeActions(Assembly bridgeAssembly)
+    {
+        var bridgeActionsType = bridgeAssembly.GetType("TwitchHeists.StreamerBot.Bridge.Services.BridgeActions", true);
+        return Activator.CreateInstance(bridgeActionsType);
+    }
+
+    private static object CreateInstance(Assembly bridgeAssembly, string typeName)
+    {
+        var type = bridgeAssembly.GetType(typeName, true);
+        return Activator.CreateInstance(type);
+    }
+
+    private static void SetProperty(object target, string propertyName, object value)
+    {
+        target.GetType().GetProperty(propertyName).SetValue(target, value, null);
+    }
+
+    private static object InvokeBridge(object bridgeActions, string methodName, params object[] arguments)
+    {
+        return bridgeActions.GetType().GetMethod(methodName).Invoke(bridgeActions, arguments);
+    }
+
+    private static string GetStringProperty(object target, string propertyName)
+    {
+        var value = target.GetType().GetProperty(propertyName).GetValue(target, null);
+        return value == null ? string.Empty : value.ToString();
+    }
+
+    private string GetResolvedTargetUsername(int inputIndex)
+    {
+        var username = GetOptionalStringArg("targetUserName", "targetUserName", "input" + inputIndex);
+        if (!string.IsNullOrWhiteSpace(username))
+        {
+            return username;
+        }
+
+        throw new InvalidOperationException(
+            "Missing target username. Add a Get User Info for Target sub-action or pass the username directly.");
+    }
+
+    private string GetResolvedTargetDisplayName(string fallbackUsername)
+    {
+        var displayName = GetOptionalStringArg("targetUser", "targetUserName");
+        return string.IsNullOrWhiteSpace(displayName) ? fallbackUsername : displayName;
+    }
+
+    private decimal GetRequiredDecimalArg(string argName)
+    {
+        var rawValue = GetRequiredStringArg(argName);
+        decimal parsedAmount;
+        if (decimal.TryParse(rawValue, NumberStyles.Number, CultureInfo.InvariantCulture, out parsedAmount))
+        {
+            return parsedAmount;
+        }
+
+        if (decimal.TryParse(rawValue, NumberStyles.Number, CultureInfo.CurrentCulture, out parsedAmount))
+        {
+            return parsedAmount;
+        }
+
+        throw new InvalidOperationException("'" + rawValue + "' is not a valid amount.");
+    }
+
+    private string GetRequiredStringArg(string argName)
+    {
+        var value = GetOptionalStringArg(argName);
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            return value;
+        }
+
+        throw new InvalidOperationException("Missing required Streamer.bot argument: " + argName + ".");
+    }
+
+    private string GetOptionalStringArg(params string[] argNames)
+    {
+        foreach (var argName in argNames)
+        {
+            string value;
+            if (CPH.TryGetArg<string>(argName, out value) && !string.IsNullOrWhiteSpace(value))
+            {
+                return value.Trim();
+            }
+        }
+
+        return null;
+    }
+
+    private int GetPointsTargetInputIndex()
+    {
+        return GetPointsVerbOffset();
+    }
+
+    private string GetPointsAmountArgName()
+    {
+        return "input" + (GetPointsVerbOffset() + 1);
+    }
+
+    private int GetPointsVerbOffset()
+    {
+        var verb = GetOptionalStringArg("input0");
+        if (string.Equals(verb, "add", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(verb, "remove", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(verb, "give", StringComparison.OrdinalIgnoreCase))
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}
 ```
 
 ### Action 7: Points remove
@@ -960,9 +1119,21 @@ Set the Streamer.bot command permissions so only moderators can trigger it.
 
 Add a **Get User Info for Target** sub-action before this Execute C# step with **User Login** = `%input0%` for a dedicated `!points remove` command, or `%input1%` for a shared `!points` command.
 
-Use the same helper members from **Action 2** and replace only the `Execute()` method with this body:
+If the literal target is `all`, skip the target lookup sub-action. `!points remove all <amount>` removes that amount from every currently active viewer, clamps each viewer at zero, and returns a summary message instead of per-user balances.
+
+This is a **full standalone `CPHInline` class**. Copy the entire block exactly as shown.
 
 ```csharp
+using System;
+using System.Globalization;
+using System.IO;
+using System.Reflection;
+
+public class CPHInline
+{
+    private const string InstallDir = @"D:\Streamer Bot\Extensions\TwitchHeist";
+    private static bool resolverRegistered;
+
 public bool Execute()
 {
     RegisterAssemblyResolver();
@@ -989,6 +1160,153 @@ public bool Execute()
     CPH.LogInfo(message);
     return true;
 }
+
+    private static void RegisterAssemblyResolver()
+    {
+        if (resolverRegistered)
+        {
+            return;
+        }
+
+        AppDomain.CurrentDomain.AssemblyResolve += ResolveFromInstallDir;
+        resolverRegistered = true;
+    }
+
+    private static Assembly ResolveFromInstallDir(object sender, ResolveEventArgs args)
+    {
+        var assemblyName = new AssemblyName(args.Name).Name + ".dll";
+        var assemblyPath = Path.Combine(InstallDir, assemblyName);
+
+        if (File.Exists(assemblyPath))
+        {
+            return Assembly.LoadFrom(assemblyPath);
+        }
+
+        return null;
+    }
+
+    private static Assembly LoadBridgeAssembly()
+    {
+        var bridgePath = Path.Combine(InstallDir, "TwitchHeists.StreamerBot.Bridge.dll");
+        if (!File.Exists(bridgePath))
+        {
+            throw new FileNotFoundException("Bridge DLL not found.", bridgePath);
+        }
+
+        return Assembly.LoadFrom(bridgePath);
+    }
+
+    private static object CreateBridgeActions(Assembly bridgeAssembly)
+    {
+        var bridgeActionsType = bridgeAssembly.GetType("TwitchHeists.StreamerBot.Bridge.Services.BridgeActions", true);
+        return Activator.CreateInstance(bridgeActionsType);
+    }
+
+    private static object CreateInstance(Assembly bridgeAssembly, string typeName)
+    {
+        var type = bridgeAssembly.GetType(typeName, true);
+        return Activator.CreateInstance(type);
+    }
+
+    private static void SetProperty(object target, string propertyName, object value)
+    {
+        target.GetType().GetProperty(propertyName).SetValue(target, value, null);
+    }
+
+    private static object InvokeBridge(object bridgeActions, string methodName, params object[] arguments)
+    {
+        return bridgeActions.GetType().GetMethod(methodName).Invoke(bridgeActions, arguments);
+    }
+
+    private static string GetStringProperty(object target, string propertyName)
+    {
+        var value = target.GetType().GetProperty(propertyName).GetValue(target, null);
+        return value == null ? string.Empty : value.ToString();
+    }
+
+    private string GetResolvedTargetUsername(int inputIndex)
+    {
+        var username = GetOptionalStringArg("targetUserName", "targetUserName", "input" + inputIndex);
+        if (!string.IsNullOrWhiteSpace(username))
+        {
+            return username;
+        }
+
+        throw new InvalidOperationException(
+            "Missing target username. Add a Get User Info for Target sub-action or pass the username directly.");
+    }
+
+    private string GetResolvedTargetDisplayName(string fallbackUsername)
+    {
+        var displayName = GetOptionalStringArg("targetUser", "targetUserName");
+        return string.IsNullOrWhiteSpace(displayName) ? fallbackUsername : displayName;
+    }
+
+    private decimal GetRequiredDecimalArg(string argName)
+    {
+        var rawValue = GetRequiredStringArg(argName);
+        decimal parsedAmount;
+        if (decimal.TryParse(rawValue, NumberStyles.Number, CultureInfo.InvariantCulture, out parsedAmount))
+        {
+            return parsedAmount;
+        }
+
+        if (decimal.TryParse(rawValue, NumberStyles.Number, CultureInfo.CurrentCulture, out parsedAmount))
+        {
+            return parsedAmount;
+        }
+
+        throw new InvalidOperationException("'" + rawValue + "' is not a valid amount.");
+    }
+
+    private string GetRequiredStringArg(string argName)
+    {
+        var value = GetOptionalStringArg(argName);
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            return value;
+        }
+
+        throw new InvalidOperationException("Missing required Streamer.bot argument: " + argName + ".");
+    }
+
+    private string GetOptionalStringArg(params string[] argNames)
+    {
+        foreach (var argName in argNames)
+        {
+            string value;
+            if (CPH.TryGetArg<string>(argName, out value) && !string.IsNullOrWhiteSpace(value))
+            {
+                return value.Trim();
+            }
+        }
+
+        return null;
+    }
+
+    private int GetPointsTargetInputIndex()
+    {
+        return GetPointsVerbOffset();
+    }
+
+    private string GetPointsAmountArgName()
+    {
+        return "input" + (GetPointsVerbOffset() + 1);
+    }
+
+    private int GetPointsVerbOffset()
+    {
+        var verb = GetOptionalStringArg("input0");
+        if (string.Equals(verb, "add", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(verb, "remove", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(verb, "give", StringComparison.OrdinalIgnoreCase))
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}
 ```
 
 ### Action 8: Points give
@@ -999,9 +1317,21 @@ This command is intended for everyone. It subtracts points from the sender balan
 
 Add a **Get User Info for Target** sub-action before this Execute C# step with **User Login** = `%input0%` for a dedicated `!points give` command, or `%input1%` for a shared `!points` command.
 
-Use the same helper members from **Action 2** and replace only the `Execute()` method with this body:
+`!points give all` is not supported. Use a real target username for give.
+
+This is a **full standalone `CPHInline` class**. Copy the entire block exactly as shown.
 
 ```csharp
+using System;
+using System.Globalization;
+using System.IO;
+using System.Reflection;
+
+public class CPHInline
+{
+    private const string InstallDir = @"D:\Streamer Bot\Extensions\TwitchHeist";
+    private static bool resolverRegistered;
+
 public bool Execute()
 {
     RegisterAssemblyResolver();
@@ -1032,6 +1362,170 @@ public bool Execute()
     CPH.LogInfo(message);
     return true;
 }
+
+    private static void RegisterAssemblyResolver()
+    {
+        if (resolverRegistered)
+        {
+            return;
+        }
+
+        AppDomain.CurrentDomain.AssemblyResolve += ResolveFromInstallDir;
+        resolverRegistered = true;
+    }
+
+    private static Assembly ResolveFromInstallDir(object sender, ResolveEventArgs args)
+    {
+        var assemblyName = new AssemblyName(args.Name).Name + ".dll";
+        var assemblyPath = Path.Combine(InstallDir, assemblyName);
+
+        if (File.Exists(assemblyPath))
+        {
+            return Assembly.LoadFrom(assemblyPath);
+        }
+
+        return null;
+    }
+
+    private static Assembly LoadBridgeAssembly()
+    {
+        var bridgePath = Path.Combine(InstallDir, "TwitchHeists.StreamerBot.Bridge.dll");
+        if (!File.Exists(bridgePath))
+        {
+            throw new FileNotFoundException("Bridge DLL not found.", bridgePath);
+        }
+
+        return Assembly.LoadFrom(bridgePath);
+    }
+
+    private static object CreateBridgeActions(Assembly bridgeAssembly)
+    {
+        var bridgeActionsType = bridgeAssembly.GetType("TwitchHeists.StreamerBot.Bridge.Services.BridgeActions", true);
+        return Activator.CreateInstance(bridgeActionsType);
+    }
+
+    private static object CreateInstance(Assembly bridgeAssembly, string typeName)
+    {
+        var type = bridgeAssembly.GetType(typeName, true);
+        return Activator.CreateInstance(type);
+    }
+
+    private static void SetProperty(object target, string propertyName, object value)
+    {
+        target.GetType().GetProperty(propertyName).SetValue(target, value, null);
+    }
+
+    private static object InvokeBridge(object bridgeActions, string methodName, params object[] arguments)
+    {
+        return bridgeActions.GetType().GetMethod(methodName).Invoke(bridgeActions, arguments);
+    }
+
+    private static string GetStringProperty(object target, string propertyName)
+    {
+        var value = target.GetType().GetProperty(propertyName).GetValue(target, null);
+        return value == null ? string.Empty : value.ToString();
+    }
+
+    private string GetSenderUsername()
+    {
+        var username = GetOptionalStringArg("userName", "user");
+        if (!string.IsNullOrWhiteSpace(username))
+        {
+            return username;
+        }
+
+        throw new InvalidOperationException("Missing sender username.");
+    }
+
+    private string GetSenderDisplayName(string fallbackUsername)
+    {
+        var displayName = GetOptionalStringArg("displayName", "user");
+        return string.IsNullOrWhiteSpace(displayName) ? fallbackUsername : displayName;
+    }
+
+    private string GetResolvedTargetUsername(int inputIndex)
+    {
+        var username = GetOptionalStringArg("targetUserName", "targetUserName", "input" + inputIndex);
+        if (!string.IsNullOrWhiteSpace(username))
+        {
+            return username;
+        }
+
+        throw new InvalidOperationException(
+            "Missing target username. Add a Get User Info for Target sub-action or pass the username directly.");
+    }
+
+    private string GetResolvedTargetDisplayName(string fallbackUsername)
+    {
+        var displayName = GetOptionalStringArg("targetUser", "targetUserName");
+        return string.IsNullOrWhiteSpace(displayName) ? fallbackUsername : displayName;
+    }
+
+    private decimal GetRequiredDecimalArg(string argName)
+    {
+        var rawValue = GetRequiredStringArg(argName);
+        decimal parsedAmount;
+        if (decimal.TryParse(rawValue, NumberStyles.Number, CultureInfo.InvariantCulture, out parsedAmount))
+        {
+            return parsedAmount;
+        }
+
+        if (decimal.TryParse(rawValue, NumberStyles.Number, CultureInfo.CurrentCulture, out parsedAmount))
+        {
+            return parsedAmount;
+        }
+
+        throw new InvalidOperationException("'" + rawValue + "' is not a valid amount.");
+    }
+
+    private string GetRequiredStringArg(string argName)
+    {
+        var value = GetOptionalStringArg(argName);
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            return value;
+        }
+
+        throw new InvalidOperationException("Missing required Streamer.bot argument: " + argName + ".");
+    }
+
+    private string GetOptionalStringArg(params string[] argNames)
+    {
+        foreach (var argName in argNames)
+        {
+            string value;
+            if (CPH.TryGetArg<string>(argName, out value) && !string.IsNullOrWhiteSpace(value))
+            {
+                return value.Trim();
+            }
+        }
+
+        return null;
+    }
+
+    private int GetPointsTargetInputIndex()
+    {
+        return GetPointsVerbOffset();
+    }
+
+    private string GetPointsAmountArgName()
+    {
+        return "input" + (GetPointsVerbOffset() + 1);
+    }
+
+    private int GetPointsVerbOffset()
+    {
+        var verb = GetOptionalStringArg("input0");
+        if (string.Equals(verb, "add", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(verb, "remove", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(verb, "give", StringComparison.OrdinalIgnoreCase))
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}
 ```
 
 ### Action 9: Watchtime lookup
@@ -1042,9 +1536,18 @@ This command returns lifetime watchtime stored in the database. If no username i
 
 If you want `!watchtime <user>` to resolve a real Twitch account instead of a raw typed string, add a **Get User Info for Target** sub-action before this Execute C# step with **User Login** = `%input0%`.
 
-Use the same helper members from **Action 2** and replace only the `Execute()` method with this body:
+This is a **full standalone `CPHInline` class**. Copy the entire block exactly as shown.
 
 ```csharp
+using System;
+using System.IO;
+using System.Reflection;
+
+public class CPHInline
+{
+    private const string InstallDir = @"D:\Streamer Bot\Extensions\TwitchHeist";
+    private static bool resolverRegistered;
+
 public bool Execute()
 {
     RegisterAssemblyResolver();
@@ -1074,6 +1577,107 @@ public bool Execute()
 
     CPH.LogInfo(message);
     return true;
+}
+
+    private static void RegisterAssemblyResolver()
+    {
+        if (resolverRegistered)
+        {
+            return;
+        }
+
+        AppDomain.CurrentDomain.AssemblyResolve += ResolveFromInstallDir;
+        resolverRegistered = true;
+    }
+
+    private static Assembly ResolveFromInstallDir(object sender, ResolveEventArgs args)
+    {
+        var assemblyName = new AssemblyName(args.Name).Name + ".dll";
+        var assemblyPath = Path.Combine(InstallDir, assemblyName);
+
+        if (File.Exists(assemblyPath))
+        {
+            return Assembly.LoadFrom(assemblyPath);
+        }
+
+        return null;
+    }
+
+    private static Assembly LoadBridgeAssembly()
+    {
+        var bridgePath = Path.Combine(InstallDir, "TwitchHeists.StreamerBot.Bridge.dll");
+        if (!File.Exists(bridgePath))
+        {
+            throw new FileNotFoundException("Bridge DLL not found.", bridgePath);
+        }
+
+        return Assembly.LoadFrom(bridgePath);
+    }
+
+    private static object CreateBridgeActions(Assembly bridgeAssembly)
+    {
+        var bridgeActionsType = bridgeAssembly.GetType("TwitchHeists.StreamerBot.Bridge.Services.BridgeActions", true);
+        return Activator.CreateInstance(bridgeActionsType);
+    }
+
+    private static object CreateInstance(Assembly bridgeAssembly, string typeName)
+    {
+        var type = bridgeAssembly.GetType(typeName, true);
+        return Activator.CreateInstance(type);
+    }
+
+    private static void SetProperty(object target, string propertyName, object value)
+    {
+        target.GetType().GetProperty(propertyName).SetValue(target, value, null);
+    }
+
+    private static object InvokeBridge(object bridgeActions, string methodName, params object[] arguments)
+    {
+        return bridgeActions.GetType().GetMethod(methodName).Invoke(bridgeActions, arguments);
+    }
+
+    private static string GetStringProperty(object target, string propertyName)
+    {
+        var value = target.GetType().GetProperty(propertyName).GetValue(target, null);
+        return value == null ? string.Empty : value.ToString();
+    }
+
+    private string GetSenderUsername()
+    {
+        var username = GetOptionalStringArg("userName", "user");
+        if (!string.IsNullOrWhiteSpace(username))
+        {
+            return username;
+        }
+
+        throw new InvalidOperationException("Missing sender username.");
+    }
+
+    private string GetSenderDisplayName(string fallbackUsername)
+    {
+        var displayName = GetOptionalStringArg("displayName", "user");
+        return string.IsNullOrWhiteSpace(displayName) ? fallbackUsername : displayName;
+    }
+
+    private string GetResolvedTargetDisplayName(string fallbackUsername)
+    {
+        var displayName = GetOptionalStringArg("targetUser", "targetUserName");
+        return string.IsNullOrWhiteSpace(displayName) ? fallbackUsername : displayName;
+    }
+
+    private string GetOptionalStringArg(params string[] argNames)
+    {
+        foreach (var argName in argNames)
+        {
+            string value;
+            if (CPH.TryGetArg<string>(argName, out value) && !string.IsNullOrWhiteSpace(value))
+            {
+                return value.Trim();
+            }
+        }
+
+        return null;
+    }
 }
 ```
 
