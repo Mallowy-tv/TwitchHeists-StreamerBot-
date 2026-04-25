@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\TwitchHeists.Core\TwitchHeists.Core.csproj" />
+    <ProjectReference Include="..\TwitchHeists.Data.Sqlite\TwitchHeists.Data.Sqlite.csproj" />
+    <ProjectReference Include="..\TwitchHeists.StreamerBot\TwitchHeists.StreamerBot.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net48" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Configuration\bridge-readme.txt" CopyToOutputDirectory="PreserveNewest" TargetPath="bridge-readme.txt" />
+    <None Include="..\TwitchHeists.StreamerBot\Configuration\appsettings.json" Link="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFrameworks>net48;netstandard2.0</TargetFrameworks>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+  </PropertyGroup>
+
+</Project>
