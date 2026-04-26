@@ -2,7 +2,33 @@
 
 TwitchHeists is a Streamer.bot integration that tracks watchtime, awards points with subscriber multipliers, supports balance commands including bulk mod adjustments for active viewers, and runs Twitch heists against a local SQLite database.
 
+It is designed to drop into a Streamer.bot setup through one bridge DLL and a small set of Execute C# actions, so the chat commands and timers in Streamer.bot call into a single local points and heist system.
+
+Out of the box, the project gives you:
+
+- watchtime tracking for chat and Community viewers
+- automatic point payouts with subscriber multipliers
+- Twitch-ID-aware balances, give/add/remove commands, and watchtime lookups
+- timed heists with joins, reminders, cooldowns, adaptive winner curves, and compact result messages
+
+## Common commands and actions
+
+| Chat command / trigger | Streamer.bot action | What you get |
+|---|---|---|
+| 5-minute timer | `RefreshCommunityViewers` | Refresh active viewers, award watchtime, and apply interval points |
+| Every chat message | `RecordChatPresence` | Track chat-only viewers between Community refreshes |
+| Go-live trigger | `StartStream` | Mark the stream live so streaks can qualify |
+| Offline trigger | `EndStream` | End the active stream and close streak qualification |
+| `!heist <amount>` | `StartHeist` | Open a timed heist with the starter's stake |
+| `!join <amount>` | `JoinHeist` | Join the open heist and add to the pot |
+| 10-30 second timer | `ResolveDueHeists` | Send reminders, resolve the heist, refund small crews, and pay winners |
+| `!points add <user> <amount>` | `AddPoints` | Mod-adjust viewer points or bulk-adjust active viewers |
+| `!points remove <user> <amount>` | `RemovePoints` | Remove points while clamping balances at zero |
+| `!points give <user> <amount>` | `GivePoints` | Transfer points from one viewer to another |
+| `!watchtime` / `!watchtime <user>` | `GetWatchtime` | Return stored lifetime watchtime from the SQLite balance store |
+
 For the Streamer.bot install flow, use `.github\docs\streamerbot-install-guide.md`.
+For the shared Streamer.bot export/import file, see [`TwitchHeists`](.\TwitchHeists).
 
 ## Projects
 
