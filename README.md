@@ -32,6 +32,8 @@ D:\Streamer Bot\Extensions\TwitchHeist\
 
 3. Import the file [TwitchHeists.txt](./TwitchHeists.txt) into Streamer.bot.
 
+4. Enable Live viewers in Streamer.bot: Platforms > Twitch > Present Viewers > Live Update.
+
 ## ℹ️ Notes
 
 - `TwitchHeists.txt` is the import file for Streamer.bot.
