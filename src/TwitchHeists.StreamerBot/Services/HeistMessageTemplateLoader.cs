@@ -33,7 +33,10 @@ public sealed class HeistMessageTemplateLoader
                 FailureCallouts = EnsureGroup(parsed.FailureCallouts, defaults.FailureCallouts),
                 SacrificeCallouts = EnsureGroup(parsed.SacrificeCallouts, defaults.SacrificeCallouts),
                 ResultSummaries = EnsureGroup(parsed.ResultSummaries, defaults.ResultSummaries),
-                InsufficientCrewMessages = EnsureGroup(parsed.InsufficientCrewMessages, defaults.InsufficientCrewMessages)
+                InsufficientCrewMessages = EnsureGroup(parsed.InsufficientCrewMessages, defaults.InsufficientCrewMessages),
+                InsufficientBalanceMessages = EnsureGroup(parsed.InsufficientBalanceMessages, defaults.InsufficientBalanceMessages),
+                AlreadyJoinedMessages = EnsureGroup(parsed.AlreadyJoinedMessages, defaults.AlreadyJoinedMessages),
+                MinimumJoinAmountMessages = EnsureGroup(parsed.MinimumJoinAmountMessages, defaults.MinimumJoinAmountMessages)
             };
         }
         catch (JsonException exception)

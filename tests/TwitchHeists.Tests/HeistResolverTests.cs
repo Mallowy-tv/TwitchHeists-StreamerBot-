@@ -7,6 +7,37 @@ namespace TwitchHeists.Tests;
 public sealed class HeistResolverTests
 {
     [Fact]
+    public void Resolve_RoundsResolvedPotAndPayoutsToWholeNumbers()
+    {
+        var randomValues = new Queue<double>(new[] { 0.01, 0.10, 0.20 });
+        var resolver = new HeistResolver(
+            new HeistSettings
+            {
+                MinimumPlayers = 2,
+                MaximumWinnerCount = 2,
+                SuccessfulPotMultiplier = 1.5m,
+                WinnerBands = new List<HeistWinnerBand> { new(2, 2, 2, 2) }
+            },
+            () => randomValues.Dequeue());
+        var participants = new[]
+        {
+            CreateParticipant("smallstake", 1m),
+            CreateParticipant("bigstake", 2m)
+        };
+
+        var result = resolver.Resolve(
+            Guid.NewGuid(),
+            participants,
+            0.75m,
+            new DateTimeOffset(2026, 4, 23, 20, 10, 0, TimeSpan.Zero));
+
+        Assert.Equal(HeistRoundState.ResolvedSuccess, result.FinalState);
+        Assert.Equal(5m, result.ResolvedPot);
+        Assert.Equal(5m, result.Winners.Sum(winner => winner.PayoutAmount));
+        Assert.All(result.Winners, winner => Assert.Equal(winner.PayoutAmount, decimal.Truncate(winner.PayoutAmount)));
+    }
+
+    [Fact]
     public void Resolve_MarksAllParticipantsAsLosersWhenTheHeistFails()
     {
         var randomValues = new Queue<double>(new[] { 0.95 });

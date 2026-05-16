@@ -1,12 +1,12 @@
 {
   "startMessages": [
-    "{starter} started a heist with {stake} points. Starting in {joinWindow}."
+    "{starter} started a heist with {stake} points. Starting in {joinWindow}. Use !join <points> to join the crew."
   ],
   "cooldownMessages": [
-    "A new heist can start in {cooldownRemaining}."
+    "A new heist can start in {cooldownRemaining}. You can still join the current crew of {participantCount} with !join <points> for a share of the {pot} point pot."
   ],
   "reminderMessages": [
-    "Heist starts in {countdown}. Pot is now {pot} points across {participantCount} viewers."
+    "Heist starts in {countdown}. Pot is now {pot} points across {participantCount} viewers. Use !join <points> to get in on the action."
   ],
   "successHeadlines": [
     "The crew cracked the vault and got away clean.",
@@ -38,5 +38,14 @@
   ],
   "insufficientCrewMessages": [
     "The crew was too small to leave the hideout. {participantCount} joined, so everyone got their {resolvedPot} points back."
+  ],
+  "insufficientBalanceMessages": [
+    "@{viewer} you need at least {stake} points to join this heist."
+  ],
+  "alreadyJoinedMessages": [
+    "@{viewer} Viewer has already joined the open heist."
+  ],
+  "minimumJoinAmountMessages": [
+    "@{viewer} the minimum join amount for this heist is {minimumJoinAmount} points."
   ]
 }

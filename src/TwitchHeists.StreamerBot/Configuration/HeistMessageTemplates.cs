@@ -34,21 +34,30 @@ public sealed class HeistMessageTemplates
     [JsonPropertyName("insufficientCrewMessages")]
     public List<string> InsufficientCrewMessages { get; set; } = new();
 
+    [JsonPropertyName("insufficientBalanceMessages")]
+    public List<string> InsufficientBalanceMessages { get; set; } = new();
+
+    [JsonPropertyName("alreadyJoinedMessages")]
+    public List<string> AlreadyJoinedMessages { get; set; } = new();
+
+    [JsonPropertyName("minimumJoinAmountMessages")]
+    public List<string> MinimumJoinAmountMessages { get; set; } = new();
+
     public static HeistMessageTemplates CreateDefault()
     {
         return new HeistMessageTemplates
         {
             StartMessages = new List<string>
             {
-                "{starter} started a heist with {stake} points. Starting in {joinWindow}."
+                "{starter} started a heist with {stake} points. Starting in {joinWindow}. Use !join <points> to join the crew."
             },
             CooldownMessages = new List<string>
             {
-                "A new heist can start in {cooldownRemaining}."
+                "A new heist can start in {cooldownRemaining}. You can still join the current crew of {participantCount} with !join <points> for a share of the {pot} point pot."
             },
             ReminderMessages = new List<string>
             {
-                "Heist starts in {countdown}. Pot is now {pot} points across {participantCount} viewers."
+                "Heist starts in {countdown}. Pot is now {pot} points across {participantCount} viewers. Use !join <points> to get in on the action."
             },
             SuccessHeadlines = new List<string>
             {
@@ -87,6 +96,18 @@ public sealed class HeistMessageTemplates
             InsufficientCrewMessages = new List<string>
             {
                 "The crew was too small to leave the hideout. {participantCount} joined, so everyone got their {resolvedPot} points back."
+            },
+            InsufficientBalanceMessages = new List<string>
+            {
+                "@{viewer} you need at least {stake} points to join this heist."
+            },
+            AlreadyJoinedMessages = new List<string>
+            {
+                "@{viewer} Viewer has already joined the open heist."
+            },
+            MinimumJoinAmountMessages = new List<string>
+            {
+                "@{viewer} the minimum join amount for this heist is {minimumJoinAmount} points."
             }
         };
     }

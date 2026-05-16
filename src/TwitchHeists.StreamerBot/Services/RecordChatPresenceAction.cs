@@ -18,6 +18,7 @@ public sealed class RecordChatPresenceAction
     public ActionResponseDto Execute(ChatPresenceDto chatPresence, DateTimeOffset nextRefreshBoundaryUtc)
     {
         var normalizedUsername = NormalizeUsername(chatPresence.Username);
+        var normalizedRefreshBoundaryUtc = TrimToSecond(nextRefreshBoundaryUtc);
         var presenceRecord = new ViewerPresenceRecord
         {
             Identity = new ViewerIdentity
@@ -31,7 +32,7 @@ public sealed class RecordChatPresenceAction
             LastSeenUtc = chatPresence.MessageReceivedAtUtc,
             PresenceSource = PresenceSource.ChatFallback,
             SubscriberTier = chatPresence.SubscriberTier,
-            PresenceExpiresAtUtc = nextRefreshBoundaryUtc
+            PresenceExpiresAtUtc = normalizedRefreshBoundaryUtc
         };
 
         viewerRepository.StoreChatPresence(presenceRecord);
@@ -47,5 +48,11 @@ public sealed class RecordChatPresenceAction
     private static string NormalizeUsername(string username)
     {
         return username.Trim().ToLowerInvariant();
+    }
+
+    private static DateTimeOffset TrimToSecond(DateTimeOffset timestamp)
+    {
+        var ticks = timestamp.Ticks - (timestamp.Ticks % TimeSpan.TicksPerSecond);
+        return new DateTimeOffset(ticks, timestamp.Offset);
     }
 }

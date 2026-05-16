@@ -63,6 +63,37 @@ public sealed class BridgeRuntimeFactory
         return actionRuntimeFactory.CreateGetWatchtimeAction(BuildConnectionString(installDirectory));
     }
 
+    public GetPointsAction CreateGetPointsAction(string installDirectory)
+    {
+        return actionRuntimeFactory.CreateGetPointsAction(BuildConnectionString(installDirectory));
+    }
+
+    public GetLeaderboardAction CreateGetLeaderboardAction(string installDirectory)
+    {
+        return actionRuntimeFactory.CreateGetLeaderboardAction(BuildConnectionString(installDirectory));
+    }
+
+    public StartRaffleAction CreateStartRaffleAction(string installDirectory)
+    {
+        return actionRuntimeFactory.CreateStartRaffleAction(
+            BuildConnectionString(installDirectory),
+            ResolveConfigurationPath(installDirectory));
+    }
+
+    public JoinRaffleAction CreateJoinRaffleAction(string installDirectory)
+    {
+        return actionRuntimeFactory.CreateJoinRaffleAction(
+            BuildConnectionString(installDirectory),
+            ResolveConfigurationPath(installDirectory));
+    }
+
+    public ResolveDueRafflesAction CreateResolveDueRafflesAction(string installDirectory)
+    {
+        return actionRuntimeFactory.CreateResolveDueRafflesAction(
+            BuildConnectionString(installDirectory),
+            ResolveConfigurationPath(installDirectory));
+    }
+
     public StartHeistAction CreateStartHeistAction(string installDirectory)
     {
         return actionRuntimeFactory.CreateStartHeistAction(
@@ -73,7 +104,10 @@ public sealed class BridgeRuntimeFactory
 
     public JoinHeistAction CreateJoinHeistAction(string installDirectory)
     {
-        return actionRuntimeFactory.CreateJoinHeistAction(BuildConnectionString(installDirectory));
+        return actionRuntimeFactory.CreateJoinHeistAction(
+            BuildConnectionString(installDirectory),
+            ResolveConfigurationPath(installDirectory),
+            ResolveHeistMessageTemplatesPath(installDirectory));
     }
 
     public ResolveDueHeistsAction CreateResolveDueHeistsAction(string installDirectory)

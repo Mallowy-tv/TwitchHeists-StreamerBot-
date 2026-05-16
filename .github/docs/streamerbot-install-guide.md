@@ -83,9 +83,16 @@ You can also tune these values before first use:
 | `Heist.MinimumSuccessChance` | `0.4` | Lowest allowed success chance |
 | `Heist.MaximumSuccessChance` | `0.75` | Highest allowed success chance |
 | `Heist.MinimumParticipants` | `2` | Minimum joined crew size before a heist can resolve normally |
+| `Heist.MinimumJoinAmount` | `1000` | Lowest join stake accepted by `!join` |
 | `Heist.WinnerBands` | built-in defaults | Adaptive winner ranges keyed by joined player count |
 | `Heist.MaximumNamedResolutionCallouts` | `2` | Max named callouts before the result falls back to summary-only text |
 | `Heist.SuccessfulPotMultiplier` | `2.0` | Pot multiplier on success |
+| `Raffle.JoinWindow` | `00:02:00` | How long a raffle stays open before draw |
+| `Raffle.OneMinuteReminderThreshold` | `00:01:00` | When to send the 1-minute raffle reminder |
+| `Raffle.ThirtySecondReminderThreshold` | `00:00:30` | When to send the 30-second raffle reminder |
+| `Raffle.TenSecondReminderThreshold` | `00:00:10` | When to send the 10-second raffle reminder |
+| `Raffle.WinnerPoints` | `5000` | Default points awarded to each raffle winner when command input omits amount |
+| `Raffle.ModeratorPointsLimit` | `5000` | Legacy moderator cap setting (raffle joins are free) |
 
 `heist-messages.json` sits beside `appsettings.json` in the same install folder and controls all heist chat output without rebuilding the project.
 
@@ -98,6 +105,9 @@ Supported message groups:
 | `startMessages` | `!heist` success text |
 | `cooldownMessages` | `!heist` rejection while cooldown is active |
 | `reminderMessages` | 1-minute, 30-second, and 10-second countdown messages |
+| `insufficientBalanceMessages` | `!heist` / `!join` failure text when a viewer does not have enough points for the stake |
+| `alreadyJoinedMessages` | `!join` failure text when a viewer has already joined the open heist |
+| `minimumJoinAmountMessages` | `!join` failure text when a viewer is below the minimum stake floor |
 | `insufficientCrewMessages` | Result text when the crew is too small and everyone is refunded |
 | `successHeadlines` | Opening line for a successful resolved heist |
 | `failureHeadlines` | Opening line for a failed resolved heist |
@@ -124,6 +134,8 @@ Supported placeholders:
 | `{loserCount}` | Number of losers |
 | `{resolvedPot}` | Final resolved pot |
 | `{successChancePercent}` | Final success chance like `68.58%` |
+| `{viewer}` | Viewer username used in join-failure messages |
+| `{minimumJoinAmount}` | Minimum stake floor used in minimum-join messages |
 
 Edit the arrays in `heist-messages.json`, save the file, and the next heist action run will use the new wording. You do not need to rebuild the DLLs just to change chat lines.
 
@@ -452,17 +464,6 @@ public class CPHInline
         return Activator.CreateInstance(bridgeActionsType);
     }
 
-    private static object CreateInstance(Assembly bridgeAssembly, string typeName)
-    {
-        var type = bridgeAssembly.GetType(typeName, true);
-        return Activator.CreateInstance(type);
-    }
-
-    private static void SetProperty(object target, string propertyName, object value)
-    {
-        target.GetType().GetProperty(propertyName).SetValue(target, value, null);
-    }
-
     private static object InvokeBridge(object bridgeActions, string methodName, params object[] arguments)
     {
         return bridgeActions.GetType().GetMethod(methodName).Invoke(bridgeActions, arguments);
@@ -767,6 +768,18 @@ public class CPHInline
     }
 }
 ```
+
+### Action 15: Points lookup
+
+Run this when chat matches `!points` or `!points <user>`.
+
+This command returns the current points balance for the sender by default, or for the tagged target when a username is supplied.
+
+If you want `!points <user>` to resolve a real Twitch account instead of a raw typed string, add a **Get User Info for Target** sub-action before this Execute C# step with **User Login** = `%input0%`.
+
+This is a **full standalone `CPHInline` class**. Copy the entire block exactly as shown.
+
+```csharp
 
 ### Action 4: Heist join
 
@@ -1667,7 +1680,636 @@ public bool Execute()
 }
 ```
 
-### Action 9: Watchtime lookup
+### Action 9: Raffle (multi-winner)
+
+Run this when chat matches `!raffle` or `!raffle <points>`.
+
+Set the Streamer.bot command permissions so only moderators and broadcaster can trigger it.
+
+Use this action to run the adaptive multi-winner draw. TwitchHeists applies the StreamElements-style winner bands automatically.
+Raffle joins are free: `!rjoin` never spends viewer points and joined entrants are not filtered by balance.
+
+This snippet reads `isBroadcaster`/`broadcaster` from Streamer.bot args. If your trigger does not provide either arg, add a **Set Argument** sub-action for the broadcaster command path (`isBroadcaster = true`) so raffle rounds are tagged correctly in logs and storage.
+
+This is a **full standalone `CPHInline` class**. Copy the entire block exactly as shown.
+
+```csharp
+using System;
+using System.Globalization;
+using System.IO;
+using System.Reflection;
+
+public class CPHInline
+{
+    private const string InstallDir = @"D:\Streamer Bot\Extensions\TwitchHeist";
+    private static bool resolverRegistered;
+
+public bool Execute()
+{
+    RegisterAssemblyResolver();
+    var bridgeAssembly = LoadBridgeAssembly();
+    var bridgeActions = CreateBridgeActions(bridgeAssembly);
+    var command = CreateInstance(bridgeAssembly, "TwitchHeists.StreamerBot.Bridge.Models.BridgeRaffleCommand");
+    var sourceUserId = GetSenderUserId();
+    var sourceUsername = GetSenderUsername();
+    var sourceDisplayName = GetSenderDisplayName(sourceUsername);
+    var isBroadcaster = GetIsBroadcaster();
+    var winnerPoints = GetRaffleWinnerPoints();
+
+    SetProperty(command, "SourceTwitchUserId", sourceUserId);
+    SetProperty(command, "SourceUsername", sourceUsername);
+    SetProperty(command, "SourceDisplayName", sourceDisplayName);
+    SetProperty(command, "IsBroadcaster", isBroadcaster);
+    SetProperty(command, "WinnerPoints", winnerPoints);
+    SetProperty(command, "OccurredAtUtc", DateTimeOffset.UtcNow);
+
+    var result = InvokeBridge(bridgeActions, "RunRaffle", InstallDir, command);
+    var message = GetStringProperty(result, "Message");
+
+    if (!string.IsNullOrWhiteSpace(message))
+    {
+        CPH.SendMessage(message);
+    }
+
+    CPH.LogInfo("[TwitchHeists][Raffle] " + message);
+    return true;
+}
+
+    private static void RegisterAssemblyResolver()
+    {
+        if (resolverRegistered)
+        {
+            return;
+        }
+
+        AppDomain.CurrentDomain.AssemblyResolve += ResolveFromInstallDir;
+        resolverRegistered = true;
+    }
+
+    private static Assembly ResolveFromInstallDir(object sender, ResolveEventArgs args)
+    {
+        var assemblyName = new AssemblyName(args.Name).Name + ".dll";
+        var assemblyPath = Path.Combine(InstallDir, assemblyName);
+
+        if (File.Exists(assemblyPath))
+        {
+            return Assembly.LoadFrom(assemblyPath);
+        }
+
+        return null;
+    }
+
+    private static Assembly LoadBridgeAssembly()
+    {
+        var bridgePath = Path.Combine(InstallDir, "TwitchHeists.StreamerBot.Bridge.dll");
+        if (!File.Exists(bridgePath))
+        {
+            throw new FileNotFoundException("Bridge DLL not found.", bridgePath);
+        }
+
+        return Assembly.LoadFrom(bridgePath);
+    }
+
+    private static object CreateBridgeActions(Assembly bridgeAssembly)
+    {
+        var bridgeActionsType = bridgeAssembly.GetType("TwitchHeists.StreamerBot.Bridge.Services.BridgeActions", true);
+        return Activator.CreateInstance(bridgeActionsType);
+    }
+
+    private static object CreateInstance(Assembly bridgeAssembly, string typeName)
+    {
+        var type = bridgeAssembly.GetType(typeName, true);
+        return Activator.CreateInstance(type);
+    }
+
+    private static void SetProperty(object target, string propertyName, object value)
+    {
+        target.GetType().GetProperty(propertyName).SetValue(target, value, null);
+    }
+
+    private static object InvokeBridge(object bridgeActions, string methodName, params object[] arguments)
+    {
+        return bridgeActions.GetType().GetMethod(methodName).Invoke(bridgeActions, arguments);
+    }
+
+    private static string GetStringProperty(object target, string propertyName)
+    {
+        var value = target.GetType().GetProperty(propertyName).GetValue(target, null);
+        return value == null ? string.Empty : value.ToString();
+    }
+
+    private string GetSenderUsername()
+    {
+        var username = GetOptionalStringArg("userName", "user");
+        if (!string.IsNullOrWhiteSpace(username))
+        {
+            return username;
+        }
+
+        throw new InvalidOperationException("Missing sender username.");
+    }
+
+    private string GetSenderDisplayName(string fallbackUsername)
+    {
+        var displayName = GetOptionalStringArg("displayName", "user");
+        return string.IsNullOrWhiteSpace(displayName) ? fallbackUsername : displayName;
+    }
+
+    private string GetSenderUserId()
+    {
+        return GetOptionalStringArg("userId");
+    }
+
+    private bool GetIsBroadcaster()
+    {
+        return GetOptionalBoolArg("isBroadcaster", "broadcaster");
+    }
+
+    private decimal GetRaffleWinnerPoints()
+    {
+        var rawInput = GetOptionalStringArg("input0");
+        if (!string.IsNullOrWhiteSpace(rawInput) &&
+            decimal.TryParse(rawInput, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsedAmount) &&
+            parsedAmount > 0)
+        {
+            return parsedAmount;
+        }
+
+        return 5000m;
+    }
+
+    private bool GetOptionalBoolArg(params string[] argNames)
+    {
+        foreach (var argName in argNames)
+        {
+            bool boolValue;
+            if (CPH.TryGetArg<bool>(argName, out boolValue))
+            {
+                return boolValue;
+            }
+
+            string stringValue;
+            if (CPH.TryGetArg<string>(argName, out stringValue) && !string.IsNullOrWhiteSpace(stringValue))
+            {
+                if (string.Equals(stringValue, "true", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(stringValue, "1", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private string GetOptionalStringArg(params string[] argNames)
+    {
+        foreach (var argName in argNames)
+        {
+            string value;
+            if (CPH.TryGetArg<string>(argName, out value) && !string.IsNullOrWhiteSpace(value))
+            {
+                return value.Trim();
+            }
+        }
+
+        return null;
+    }
+}
+```
+
+### Action 10: Raffle (single winner)
+
+Run this when chat matches `!sraffle` or `!sraffle <points>`.
+
+Set the Streamer.bot command permissions so only moderators and broadcaster can trigger it.
+
+Use this action to force exactly one winner while keeping the same entrant filtering rules.
+
+This is a **full standalone `CPHInline` class**. Copy the entire block exactly as shown.
+
+```csharp
+using System;
+using System.Globalization;
+using System.IO;
+using System.Reflection;
+
+public class CPHInline
+{
+    private const string InstallDir = @"D:\Streamer Bot\Extensions\TwitchHeist";
+    private static bool resolverRegistered;
+
+public bool Execute()
+{
+    RegisterAssemblyResolver();
+    var bridgeAssembly = LoadBridgeAssembly();
+    var bridgeActions = CreateBridgeActions(bridgeAssembly);
+    var command = CreateInstance(bridgeAssembly, "TwitchHeists.StreamerBot.Bridge.Models.BridgeRaffleCommand");
+    var sourceUserId = GetSenderUserId();
+    var sourceUsername = GetSenderUsername();
+    var sourceDisplayName = GetSenderDisplayName(sourceUsername);
+    var isBroadcaster = GetIsBroadcaster();
+    var winnerPoints = GetRaffleWinnerPoints();
+
+    SetProperty(command, "SourceTwitchUserId", sourceUserId);
+    SetProperty(command, "SourceUsername", sourceUsername);
+    SetProperty(command, "SourceDisplayName", sourceDisplayName);
+    SetProperty(command, "IsBroadcaster", isBroadcaster);
+    SetProperty(command, "WinnerPoints", winnerPoints);
+    SetProperty(command, "OccurredAtUtc", DateTimeOffset.UtcNow);
+
+    var result = InvokeBridge(bridgeActions, "RunSingleWinnerRaffle", InstallDir, command);
+    var message = GetStringProperty(result, "Message");
+
+    if (!string.IsNullOrWhiteSpace(message))
+    {
+        CPH.SendMessage(message);
+    }
+
+    CPH.LogInfo("[TwitchHeists][SingleRaffle] " + message);
+    return true;
+}
+
+    private static void RegisterAssemblyResolver()
+    {
+        if (resolverRegistered)
+        {
+            return;
+        }
+
+        AppDomain.CurrentDomain.AssemblyResolve += ResolveFromInstallDir;
+        resolverRegistered = true;
+    }
+
+    private static Assembly ResolveFromInstallDir(object sender, ResolveEventArgs args)
+    {
+        var assemblyName = new AssemblyName(args.Name).Name + ".dll";
+        var assemblyPath = Path.Combine(InstallDir, assemblyName);
+
+        if (File.Exists(assemblyPath))
+        {
+            return Assembly.LoadFrom(assemblyPath);
+        }
+
+        return null;
+    }
+
+    private static Assembly LoadBridgeAssembly()
+    {
+        var bridgePath = Path.Combine(InstallDir, "TwitchHeists.StreamerBot.Bridge.dll");
+        if (!File.Exists(bridgePath))
+        {
+            throw new FileNotFoundException("Bridge DLL not found.", bridgePath);
+        }
+
+        return Assembly.LoadFrom(bridgePath);
+    }
+
+    private static object CreateBridgeActions(Assembly bridgeAssembly)
+    {
+        var bridgeActionsType = bridgeAssembly.GetType("TwitchHeists.StreamerBot.Bridge.Services.BridgeActions", true);
+        return Activator.CreateInstance(bridgeActionsType);
+    }
+
+    private static object CreateInstance(Assembly bridgeAssembly, string typeName)
+    {
+        var type = bridgeAssembly.GetType(typeName, true);
+        return Activator.CreateInstance(type);
+    }
+
+    private static void SetProperty(object target, string propertyName, object value)
+    {
+        target.GetType().GetProperty(propertyName).SetValue(target, value, null);
+    }
+
+    private static object InvokeBridge(object bridgeActions, string methodName, params object[] arguments)
+    {
+        return bridgeActions.GetType().GetMethod(methodName).Invoke(bridgeActions, arguments);
+    }
+
+    private static string GetStringProperty(object target, string propertyName)
+    {
+        var value = target.GetType().GetProperty(propertyName).GetValue(target, null);
+        return value == null ? string.Empty : value.ToString();
+    }
+
+    private string GetSenderUsername()
+    {
+        var username = GetOptionalStringArg("userName", "user");
+        if (!string.IsNullOrWhiteSpace(username))
+        {
+            return username;
+        }
+
+        throw new InvalidOperationException("Missing sender username.");
+    }
+
+    private string GetSenderDisplayName(string fallbackUsername)
+    {
+        var displayName = GetOptionalStringArg("displayName", "user");
+        return string.IsNullOrWhiteSpace(displayName) ? fallbackUsername : displayName;
+    }
+
+    private string GetSenderUserId()
+    {
+        return GetOptionalStringArg("userId");
+    }
+
+    private bool GetIsBroadcaster()
+    {
+        return GetOptionalBoolArg("isBroadcaster", "broadcaster");
+    }
+
+    private decimal GetRaffleWinnerPoints()
+    {
+        var rawInput = GetOptionalStringArg("input0");
+        if (!string.IsNullOrWhiteSpace(rawInput) &&
+            decimal.TryParse(rawInput, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsedAmount) &&
+            parsedAmount > 0)
+        {
+            return parsedAmount;
+        }
+
+        return 5000m;
+    }
+
+    private bool GetOptionalBoolArg(params string[] argNames)
+    {
+        foreach (var argName in argNames)
+        {
+            bool boolValue;
+            if (CPH.TryGetArg<bool>(argName, out boolValue))
+            {
+                return boolValue;
+            }
+
+            string stringValue;
+            if (CPH.TryGetArg<string>(argName, out stringValue) && !string.IsNullOrWhiteSpace(stringValue))
+            {
+                if (string.Equals(stringValue, "true", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(stringValue, "1", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private string GetOptionalStringArg(params string[] argNames)
+    {
+        foreach (var argName in argNames)
+        {
+            string value;
+            if (CPH.TryGetArg<string>(argName, out value) && !string.IsNullOrWhiteSpace(value))
+            {
+                return value.Trim();
+            }
+        }
+
+        return null;
+    }
+}
+```
+
+### Action 11: Raffle join
+
+Run this when chat matches `!rjoin`.
+
+This command opts the sender into the currently open raffle window.
+
+This is a **full standalone `CPHInline` class**. Copy the entire block exactly as shown.
+
+```csharp
+using System;
+using System.IO;
+using System.Reflection;
+
+public class CPHInline
+{
+    private const string InstallDir = @"D:\Streamer Bot\Extensions\TwitchHeist";
+    private static bool resolverRegistered;
+
+public bool Execute()
+{
+    RegisterAssemblyResolver();
+    var bridgeAssembly = LoadBridgeAssembly();
+    var bridgeActions = CreateBridgeActions(bridgeAssembly);
+    var command = CreateInstance(bridgeAssembly, "TwitchHeists.StreamerBot.Bridge.Models.BridgeRaffleCommand");
+    var sourceUserId = GetSenderUserId();
+    var sourceUsername = GetSenderUsername();
+    var sourceDisplayName = GetSenderDisplayName(sourceUsername);
+
+    SetProperty(command, "SourceTwitchUserId", sourceUserId);
+    SetProperty(command, "SourceUsername", sourceUsername);
+    SetProperty(command, "SourceDisplayName", sourceDisplayName);
+    SetProperty(command, "OccurredAtUtc", DateTimeOffset.UtcNow);
+
+    var result = InvokeBridge(bridgeActions, "JoinRaffle", InstallDir, command);
+    var message = GetStringProperty(result, "Message");
+
+    if (!string.IsNullOrWhiteSpace(message))
+    {
+        CPH.SendMessage(message);
+    }
+
+    CPH.LogInfo("[TwitchHeists][RaffleJoin] " + message);
+    return true;
+}
+
+    private static void RegisterAssemblyResolver()
+    {
+        if (resolverRegistered)
+        {
+            return;
+        }
+
+        AppDomain.CurrentDomain.AssemblyResolve += ResolveFromInstallDir;
+        resolverRegistered = true;
+    }
+
+    private static Assembly ResolveFromInstallDir(object sender, ResolveEventArgs args)
+    {
+        var assemblyName = new AssemblyName(args.Name).Name + ".dll";
+        var assemblyPath = Path.Combine(InstallDir, assemblyName);
+
+        if (File.Exists(assemblyPath))
+        {
+            return Assembly.LoadFrom(assemblyPath);
+        }
+
+        return null;
+    }
+
+    private static Assembly LoadBridgeAssembly()
+    {
+        var bridgePath = Path.Combine(InstallDir, "TwitchHeists.StreamerBot.Bridge.dll");
+        if (!File.Exists(bridgePath))
+        {
+            throw new FileNotFoundException("Bridge DLL not found.", bridgePath);
+        }
+
+        return Assembly.LoadFrom(bridgePath);
+    }
+
+    private static object CreateBridgeActions(Assembly bridgeAssembly)
+    {
+        var bridgeActionsType = bridgeAssembly.GetType("TwitchHeists.StreamerBot.Bridge.Services.BridgeActions", true);
+        return Activator.CreateInstance(bridgeActionsType);
+    }
+
+    private static object CreateInstance(Assembly bridgeAssembly, string typeName)
+    {
+        var type = bridgeAssembly.GetType(typeName, true);
+        return Activator.CreateInstance(type);
+    }
+
+    private static void SetProperty(object target, string propertyName, object value)
+    {
+        target.GetType().GetProperty(propertyName).SetValue(target, value, null);
+    }
+
+    private static object InvokeBridge(object bridgeActions, string methodName, params object[] arguments)
+    {
+        return bridgeActions.GetType().GetMethod(methodName).Invoke(bridgeActions, arguments);
+    }
+
+    private static string GetStringProperty(object target, string propertyName)
+    {
+        var value = target.GetType().GetProperty(propertyName).GetValue(target, null);
+        return value == null ? string.Empty : value.ToString();
+    }
+
+    private string GetSenderUsername()
+    {
+        var username = GetOptionalStringArg("userName", "user");
+        if (!string.IsNullOrWhiteSpace(username))
+        {
+            return username;
+        }
+
+        throw new InvalidOperationException("Missing sender username.");
+    }
+
+    private string GetSenderDisplayName(string fallbackUsername)
+    {
+        var displayName = GetOptionalStringArg("displayName", "user");
+        return string.IsNullOrWhiteSpace(displayName) ? fallbackUsername : displayName;
+    }
+
+    private string? GetSenderUserId()
+    {
+        return GetOptionalStringArg("userId");
+    }
+
+    private string? GetOptionalStringArg(params string[] argNames)
+    {
+        foreach (var argName in argNames)
+        {
+            string value;
+            if (CPH.TryGetArg<string>(argName, out value) && !string.IsNullOrWhiteSpace(value))
+            {
+                return value.Trim();
+            }
+        }
+
+        return null;
+    }
+}
+```
+
+### Action 12: Raffle resolution timer
+
+Run this on a short repeating timer (10-30 seconds), just like heist resolution.
+
+This timer sends raffle countdown reminders (1m / 30s / 10s) and posts the final winner message when a raffle is due.
+
+This is a **full standalone `CPHInline` class**. Copy the entire block exactly as shown.
+
+```csharp
+using System;
+using System.IO;
+using System.Reflection;
+
+public class CPHInline
+{
+    private const string InstallDir = @"D:\Streamer Bot\Extensions\TwitchHeist";
+    private static bool resolverRegistered;
+
+public bool Execute()
+{
+    RegisterAssemblyResolver();
+    var bridgeAssembly = LoadBridgeAssembly();
+    var bridgeActions = CreateBridgeActions(bridgeAssembly);
+    var result = InvokeBridge(bridgeActions, "ResolveDueRaffles", InstallDir, DateTimeOffset.UtcNow);
+    var message = GetStringProperty(result, "Message");
+
+    if (!string.IsNullOrWhiteSpace(message) &&
+        !string.Equals(message, "No due raffles to resolve.", StringComparison.OrdinalIgnoreCase))
+    {
+        CPH.SendMessage(message);
+    }
+
+    CPH.LogInfo("[TwitchHeists][RaffleTimer] " + message);
+    return true;
+}
+
+    private static void RegisterAssemblyResolver()
+    {
+        if (resolverRegistered)
+        {
+            return;
+        }
+
+        AppDomain.CurrentDomain.AssemblyResolve += ResolveFromInstallDir;
+        resolverRegistered = true;
+    }
+
+    private static Assembly ResolveFromInstallDir(object sender, ResolveEventArgs args)
+    {
+        var assemblyName = new AssemblyName(args.Name).Name + ".dll";
+        var assemblyPath = Path.Combine(InstallDir, assemblyName);
+
+        if (File.Exists(assemblyPath))
+        {
+            return Assembly.LoadFrom(assemblyPath);
+        }
+
+        return null;
+    }
+
+    private static Assembly LoadBridgeAssembly()
+    {
+        var bridgePath = Path.Combine(InstallDir, "TwitchHeists.StreamerBot.Bridge.dll");
+        if (!File.Exists(bridgePath))
+        {
+            throw new FileNotFoundException("Bridge DLL not found.", bridgePath);
+        }
+
+        return Assembly.LoadFrom(bridgePath);
+    }
+
+    private static object CreateBridgeActions(Assembly bridgeAssembly)
+    {
+        var bridgeActionsType = bridgeAssembly.GetType("TwitchHeists.StreamerBot.Bridge.Services.BridgeActions", true);
+        return Activator.CreateInstance(bridgeActionsType);
+    }
+
+    private static object InvokeBridge(object bridgeActions, string methodName, params object[] arguments)
+    {
+        return bridgeActions.GetType().GetMethod(methodName).Invoke(bridgeActions, arguments);
+    }
+
+    private static string GetStringProperty(object target, string propertyName)
+    {
+        var value = target.GetType().GetProperty(propertyName).GetValue(target, null);
+        return value == null ? string.Empty : value.ToString();
+    }
+}
+```
+
+### Action 13: Watchtime lookup
 
 Run this when chat matches `!watchtime` or `!watchtime <user>`.
 
@@ -1814,6 +2456,249 @@ public bool Execute()
     }
 
     private string GetOptionalStringArg(params string[] argNames)
+    {
+        foreach (var argName in argNames)
+        {
+            string value;
+            if (CPH.TryGetArg<string>(argName, out value) && !string.IsNullOrWhiteSpace(value))
+            {
+                return value.Trim();
+            }
+        }
+
+        return null;
+    }
+}
+```
+
+### Action 14: Leaderboard lookup
+
+Run this when chat matches `!leaderboard`.
+
+This command returns the top five viewers by points, formatted as `1. username (points)` on separate lines.
+
+```csharp
+using System;
+using System.IO;
+using System.Reflection;
+
+public class CPHInline
+{
+    private const string InstallDir = @"D:\Streamer Bot\Extensions\TwitchHeist";
+    private static bool resolverRegistered;
+
+    public bool Execute()
+    {
+        RegisterAssemblyResolver();
+        var bridgeAssembly = LoadBridgeAssembly();
+        var bridgeActions = CreateBridgeActions(bridgeAssembly);
+        var result = InvokeBridge(bridgeActions, "GetLeaderboard", InstallDir);
+        var message = GetStringProperty(result, "Message");
+
+        if (!string.IsNullOrWhiteSpace(message))
+        {
+            CPH.SendMessage(message);
+        }
+
+        CPH.LogInfo("[TwitchHeists][Leaderboard] " + message);
+        return true;
+    }
+
+    private static void RegisterAssemblyResolver()
+    {
+        if (resolverRegistered)
+        {
+            return;
+        }
+
+        AppDomain.CurrentDomain.AssemblyResolve += ResolveFromInstallDir;
+        resolverRegistered = true;
+    }
+
+    private static Assembly ResolveFromInstallDir(object sender, ResolveEventArgs args)
+    {
+        var assemblyName = new AssemblyName(args.Name).Name + ".dll";
+        var assemblyPath = Path.Combine(InstallDir, assemblyName);
+
+        return File.Exists(assemblyPath)
+            ? Assembly.LoadFrom(assemblyPath)
+            : null;
+    }
+
+    private static Assembly LoadBridgeAssembly()
+    {
+        var bridgePath = Path.Combine(InstallDir, "TwitchHeists.StreamerBot.Bridge.dll");
+        if (!File.Exists(bridgePath))
+        {
+            throw new FileNotFoundException("Bridge DLL not found.", bridgePath);
+        }
+
+        return Assembly.LoadFrom(bridgePath);
+    }
+
+    private static object CreateBridgeActions(Assembly bridgeAssembly)
+    {
+        var bridgeActionsType = bridgeAssembly.GetType("TwitchHeists.StreamerBot.Bridge.Services.BridgeActions", true);
+        return Activator.CreateInstance(bridgeActionsType);
+    }
+
+    private static object InvokeBridge(object bridgeActions, string methodName, params object[] arguments)
+    {
+        return bridgeActions.GetType().GetMethod(methodName).Invoke(bridgeActions, arguments);
+    }
+
+    private static string GetStringProperty(object target, string propertyName)
+    {
+        var value = target.GetType().GetProperty(propertyName).GetValue(target, null);
+        return value == null ? string.Empty : value.ToString();
+    }
+}
+```
+
+### Action 15: Points lookup
+
+Run this when chat matches `!points` or `!points <user>`.
+
+This command returns the current points balance for the sender by default, or for the tagged target when a username is supplied.
+
+If you want `!points <user>` to resolve a real Twitch account instead of a raw typed string, add a **Get User Info for Target** sub-action before this Execute C# step with **User Login** = `%input0%`.
+
+This is a **full standalone `CPHInline` class**. Copy the entire block exactly as shown.
+
+```csharp
+using System;
+using System.IO;
+using System.Reflection;
+
+public class CPHInline
+{
+    private const string InstallDir = @"D:\Streamer Bot\Extensions\TwitchHeist";
+    private static bool resolverRegistered;
+
+    public bool Execute()
+    {
+        RegisterAssemblyResolver();
+        var bridgeAssembly = LoadBridgeAssembly();
+        var bridgeActions = CreateBridgeActions(bridgeAssembly);
+        var query = CreateInstance(bridgeAssembly, "TwitchHeists.StreamerBot.Bridge.Models.BridgePointsQuery");
+        var requesterUserId = GetSenderUserId();
+        var requesterUsername = GetSenderUsername();
+        var requesterDisplayName = GetSenderDisplayName(requesterUsername);
+        var targetUserId = GetOptionalStringArg("targetUserId");
+        var targetUsername = GetOptionalStringArg("targetUserName", "input0");
+        var targetDisplayName = string.IsNullOrWhiteSpace(targetUsername)
+            ? null
+            : GetResolvedTargetDisplayName(targetUsername);
+
+        SetProperty(query, "RequesterTwitchUserId", requesterUserId);
+        SetProperty(query, "RequesterUsername", requesterUsername);
+        SetProperty(query, "RequesterDisplayName", requesterDisplayName);
+        SetProperty(query, "TargetTwitchUserId", targetUserId);
+        SetProperty(query, "TargetUsername", targetUsername);
+        SetProperty(query, "TargetDisplayName", targetDisplayName);
+        SetProperty(query, "OccurredAtUtc", DateTimeOffset.UtcNow);
+
+        var result = InvokeBridge(bridgeActions, "GetPoints", InstallDir, query);
+        var message = GetStringProperty(result, "Message");
+
+        if (!string.IsNullOrWhiteSpace(message))
+        {
+            CPH.SendMessage(message);
+        }
+
+        CPH.LogInfo("[TwitchHeists][PointsLookup] " + message);
+        return true;
+    }
+
+    private static void RegisterAssemblyResolver()
+    {
+        if (resolverRegistered)
+        {
+            return;
+        }
+
+        AppDomain.CurrentDomain.AssemblyResolve += ResolveFromInstallDir;
+        resolverRegistered = true;
+    }
+
+    private static Assembly ResolveFromInstallDir(object sender, ResolveEventArgs args)
+    {
+        var assemblyName = new AssemblyName(args.Name).Name + ".dll";
+        var assemblyPath = Path.Combine(InstallDir, assemblyName);
+
+        return File.Exists(assemblyPath)
+            ? Assembly.LoadFrom(assemblyPath)
+            : null;
+    }
+
+    private static Assembly LoadBridgeAssembly()
+    {
+        var bridgePath = Path.Combine(InstallDir, "TwitchHeists.StreamerBot.Bridge.dll");
+        if (!File.Exists(bridgePath))
+        {
+            throw new FileNotFoundException("Bridge DLL not found.", bridgePath);
+        }
+
+        return Assembly.LoadFrom(bridgePath);
+    }
+
+    private static object CreateBridgeActions(Assembly bridgeAssembly)
+    {
+        var bridgeActionsType = bridgeAssembly.GetType("TwitchHeists.StreamerBot.Bridge.Services.BridgeActions", true);
+        return Activator.CreateInstance(bridgeActionsType);
+    }
+
+    private static object CreateInstance(Assembly bridgeAssembly, string typeName)
+    {
+        var type = bridgeAssembly.GetType(typeName, true);
+        return Activator.CreateInstance(type);
+    }
+
+    private static void SetProperty(object target, string propertyName, object value)
+    {
+        target.GetType().GetProperty(propertyName).SetValue(target, value, null);
+    }
+
+    private static object InvokeBridge(object bridgeActions, string methodName, params object[] arguments)
+    {
+        return bridgeActions.GetType().GetMethod(methodName).Invoke(bridgeActions, arguments);
+    }
+
+    private static string GetStringProperty(object target, string propertyName)
+    {
+        var value = target.GetType().GetProperty(propertyName).GetValue(target, null);
+        return value == null ? string.Empty : value.ToString();
+    }
+
+    private string GetSenderUsername()
+    {
+        var username = GetOptionalStringArg("userName", "user");
+        if (!string.IsNullOrWhiteSpace(username))
+        {
+            return username;
+        }
+
+        throw new InvalidOperationException("Missing sender username.");
+    }
+
+    private string GetSenderDisplayName(string fallbackUsername)
+    {
+        var displayName = GetOptionalStringArg("displayName", "user");
+        return string.IsNullOrWhiteSpace(displayName) ? fallbackUsername : displayName;
+    }
+
+    private string? GetSenderUserId()
+    {
+        return GetOptionalStringArg("userId");
+    }
+
+    private string GetResolvedTargetDisplayName(string fallbackUsername)
+    {
+        var displayName = GetOptionalStringArg("targetUser", "targetUserName");
+        return string.IsNullOrWhiteSpace(displayName) ? fallbackUsername : displayName;
+    }
+
+    private string? GetOptionalStringArg(params string[] argNames)
     {
         foreach (var argName in argNames)
         {
@@ -2028,7 +2913,7 @@ public class CPHInline
 The reflection loader still returns the bridge result object at runtime. The snippets above read `result.Message` with reflection and then:
 
 - log it in every action;
-- send it to chat for `!heist`, `!join`, resolved heists, points commands, and `!watchtime`;
+- send it to chat for `!heist`, `!join`, resolved heists, points commands, `!raffle`, `!sraffle`, `!rjoin`, and `!watchtime`;
 - avoid sending the `chatPresence`, `StartStream`, and `EndStream` results to chat so you do not spam every message.
 
 ## 8. Recommended trigger map
@@ -2045,6 +2930,12 @@ The reflection loader still returns the bridge result object at runtime. The sni
 | Command `!points add` (mods only) | `AddPoints` |
 | Command `!points remove` (mods only) | `RemovePoints` |
 | Command `!points give` | `GivePoints` |
+| Command `!points` | `GetPoints` |
+| Command `!leaderboard` | `GetLeaderboard` |
+| Command `!raffle [points]` (mods + broadcaster) | `RunRaffle` |
+| Command `!sraffle [points]` (mods + broadcaster) | `RunSingleWinnerRaffle` |
+| Command `!rjoin` | `JoinRaffle` |
+| 10-30 second timer | `ResolveDueRaffles` |
 | Command `!watchtime` | `GetWatchtime` |
 
 Use the `userId` chat arg for the sender and the `targetUserId` value from **Get User Info for Target** wherever those values are available. TwitchHeists now treats Twitch user ID as the stable identity for balances, watchtime, and heist ownership, while still falling back to usernames for older rows and commands.
@@ -2059,14 +2950,15 @@ Watch streaks are silent. They do not send chat output when a viewer qualifies. 
 4. You copied the `runtimes\` folder too.
 5. Every Streamer.bot action uses the same `installDir`.
 6. Your Community refresh action runs every 5 minutes.
-7. Your heist resolution action runs more frequently than the join window.
+7. Your heist and raffle resolution actions run more frequently than their join windows.
 8. You did **not** add `netstandard.dll`.
 9. Your Execute C# snippets call `RegisterAssemblyResolver();` before loading the bridge.
 10. Your Execute C# snippets load `TwitchHeists.StreamerBot.Bridge.dll` from `InstallDir` with `Assembly.LoadFrom(...)`.
 11. Your `!points add` and `!points remove` command permissions are restricted to moderators.
-12. Your target-based commands add **Get User Info for Target** before Execute C# so `targetUserName`, `targetUser`, and `targetUserId` are available.
-13. Your chat and community snippets pass a real subscriber tier instead of leaving `SubscriberTier` hardcoded to `0`.
-14. Your Streamer.bot workflow fires `StartStream` when you go live and `EndStream` when the stream ends.
+12. Your `!raffle` and `!sraffle` command permissions allow moderators and broadcaster.
+13. Your target-based commands add **Get User Info for Target** before Execute C# so `targetUserName`, `targetUser`, and `targetUserId` are available.
+14. Your chat and community snippets pass a real subscriber tier instead of leaving `SubscriberTier` hardcoded to `0`.
+15. Your Streamer.bot workflow fires `StartStream` when you go live and `EndStream` when the stream ends. If you start Streamer.bot after the stream is already live, manually run your `StartStream` action once so streak logic is in sync.
 
 ## 10. Operational notes
 
@@ -2079,4 +2971,10 @@ Watch streaks are silent. They do not send chat output when a viewer qualifies. 
 7. Large heist result messages stay compact and respect `Heist.MaximumNamedResolutionCallouts`.
 8. `!points remove` clamps the target balance to zero instead of allowing negative balances.
 9. `!points give` fails when the sender does not have enough points.
-10. `!watchtime` returns lifetime rewarded watch minutes, not just the current stream session.
+10. `!raffle <points>` opens a timed window, posts 1m/30s/10s countdown messages from the raffle timer, then applies StreamElements-style multi-winner bands.
+11. `!sraffle <points>` opens the same timed window but always resolves to one winner.
+12. If raffle command input omits points, both commands fall back to `5000`.
+13. Raffle winners receive command-specified points (or default `Raffle.WinnerPoints`) each, and the raffle result message includes the awarded points.
+14. `!rjoin` is free: joining never spends points, and joined entrants are eligible regardless of balance.
+15. `!watchtime` returns lifetime rewarded watch minutes, not just the current stream session.
+16. Points are always rounded to whole numbers across rewards, command adjustments, heist stakes/payouts, and balance responses.

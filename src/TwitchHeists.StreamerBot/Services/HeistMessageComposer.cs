@@ -1,6 +1,7 @@
 using System.Globalization;
 using TwitchHeists.Core.Models;
 using TwitchHeists.Core.Options;
+using TwitchHeists.Core.Services;
 using TwitchHeists.StreamerBot.Configuration;
 
 namespace TwitchHeists.StreamerBot.Services;
@@ -58,6 +59,38 @@ public sealed class HeistMessageComposer
             });
     }
 
+    public string ComposeInsufficientBalance(string viewer, decimal stakeAmount)
+    {
+        return ReplaceTokens(
+            SelectTemplate(templates.InsufficientBalanceMessages),
+            new Dictionary<string, string>
+            {
+                ["viewer"] = viewer,
+                ["stake"] = FormatAmount(stakeAmount)
+            });
+    }
+
+    public string ComposeAlreadyJoined(string viewer)
+    {
+        return ReplaceTokens(
+            SelectTemplate(templates.AlreadyJoinedMessages),
+            new Dictionary<string, string>
+            {
+                ["viewer"] = viewer
+            });
+    }
+
+    public string ComposeMinimumJoinAmount(string viewer, decimal minimumJoinAmount)
+    {
+        return ReplaceTokens(
+            SelectTemplate(templates.MinimumJoinAmountMessages),
+            new Dictionary<string, string>
+            {
+                ["viewer"] = viewer,
+                ["minimumJoinAmount"] = FormatAmount(minimumJoinAmount)
+            });
+    }
+
     public string ComposeResolution(HeistResolutionResult resolution)
     {
         if (resolution.FinalState == HeistRoundState.InsufficientCrew)
@@ -81,6 +114,7 @@ public sealed class HeistMessageComposer
     private IEnumerable<string> BuildCallouts(HeistResolutionResult resolution, bool isSuccess)
     {
         var callouts = new List<string>();
+        var usedTemplates = new HashSet<string>(StringComparer.Ordinal);
         var maximumNamedCallouts = Math.Max(0, heistSettings.MaximumNamedResolutionCallouts);
         if (maximumNamedCallouts == 0)
         {
@@ -91,13 +125,17 @@ public sealed class HeistMessageComposer
         {
             if (resolution.Losers.Count > 0 && resolution.Winners.Count > 0 && callouts.Count < maximumNamedCallouts)
             {
-                callouts.Add(
-                    ReplaceTokens(
-                        SelectTemplate(templates.SacrificeCallouts),
-                        BuildParticipantTokens(
-                            resolution.Winners[0],
-                            resolution.Losers[0],
-                            resolution)));
+                var sacrificeTemplate = SelectTemplate(templates.SacrificeCallouts);
+                if (usedTemplates.Add(sacrificeTemplate))
+                {
+                    callouts.Add(
+                        ReplaceTokens(
+                            sacrificeTemplate,
+                            BuildParticipantTokens(
+                                resolution.Winners[0],
+                                resolution.Losers[0],
+                                resolution)));
+                }
             }
 
             foreach (var winner in resolution.Winners)
@@ -107,9 +145,15 @@ public sealed class HeistMessageComposer
                     break;
                 }
 
+                var successTemplate = SelectTemplate(templates.SuccessCallouts);
+                if (!usedTemplates.Add(successTemplate))
+                {
+                    continue;
+                }
+
                 callouts.Add(
                     ReplaceTokens(
-                        SelectTemplate(templates.SuccessCallouts),
+                        successTemplate,
                         BuildParticipantTokens(
                             winner,
                             resolution.Losers.Count > 0 ? resolution.Losers[0] : null,
@@ -126,9 +170,15 @@ public sealed class HeistMessageComposer
                 break;
             }
 
+            var failureTemplate = SelectTemplate(templates.FailureCallouts);
+            if (!usedTemplates.Add(failureTemplate))
+            {
+                continue;
+            }
+
             callouts.Add(
                 ReplaceTokens(
-                    SelectTemplate(templates.FailureCallouts),
+                    failureTemplate,
                     BuildParticipantTokens(null, loser, resolution)));
         }
 
@@ -205,7 +255,7 @@ public sealed class HeistMessageComposer
 
     private static string FormatAmount(decimal amount)
     {
-        return amount.ToString("0.##", CultureInfo.InvariantCulture);
+        return PointValueNormalizer.Format(amount);
     }
 
     private static string FormatPercentage(decimal value)

@@ -18,6 +18,67 @@ public sealed class RefreshCommunityViewersActionTests : IDisposable
     }
 
     [Fact]
+    public void Execute_IgnoresPlaceholderCommunityRowsAndReturnsWarning()
+    {
+        var repository = CreateRepository();
+        var action = new RefreshCommunityViewersAction(repository, new WatchtimeCalculator(new RewardSettings()));
+
+        var result = action.Execute(
+            new DateTimeOffset(2026, 4, 23, 20, 0, 0, TimeSpan.Zero),
+            new[]
+            {
+                new CommunityViewerDto
+                {
+                    TwitchUserId = "<viewer twitch user id>",
+                    Username = "<viewer username>",
+                    DisplayName = "<viewer display name>"
+                }
+            });
+
+        Assert.True(result.Success);
+        Assert.Contains("placeholder username", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(repository.GetActivePresence());
+    }
+
+    [Fact]
+    public void Execute_StillAwardsChatFallbackWhenCommunitySnapshotContainsOnlyPlaceholderRows()
+    {
+        var repository = CreateRepository();
+        repository.StoreChatPresence(new ViewerPresenceRecord
+        {
+            Identity = new ViewerIdentity
+            {
+                Username = "chatviewer",
+                NormalizedUsername = "chatviewer",
+                DisplayName = "ChatViewer"
+            },
+            ActiveSinceUtc = new DateTimeOffset(2026, 4, 23, 19, 58, 0, TimeSpan.Zero),
+            LastSeenUtc = new DateTimeOffset(2026, 4, 23, 19, 59, 0, TimeSpan.Zero),
+            PresenceSource = PresenceSource.ChatFallback,
+            SubscriberTier = TwitchSubscriberTier.None,
+            PresenceExpiresAtUtc = new DateTimeOffset(2026, 4, 23, 20, 0, 0, TimeSpan.Zero)
+        });
+        var action = new RefreshCommunityViewersAction(repository, new WatchtimeCalculator(new RewardSettings()));
+
+        var result = action.Execute(
+            new DateTimeOffset(2026, 4, 23, 20, 0, 0, TimeSpan.Zero),
+            new[]
+            {
+                new CommunityViewerDto
+                {
+                    TwitchUserId = "<viewer twitch user id>",
+                    Username = "<viewer username>",
+                    DisplayName = "<viewer display name>"
+                }
+            });
+
+        Assert.True(result.Success);
+        Assert.Contains("placeholder username", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(1, result.RewardedViewerCount);
+        Assert.Equal(500m, repository.GetViewerBalance("chatviewer"));
+    }
+
+    [Fact]
     public void Execute_AwardsConfirmedViewersOncePerCycle()
     {
         var repository = CreateRepository();
@@ -34,8 +95,8 @@ public sealed class RefreshCommunityViewersActionTests : IDisposable
 
         Assert.Equal(2, firstResult.RewardedViewerCount);
         Assert.Equal(0, secondResult.RewardedViewerCount);
-        Assert.Equal(10m, repository.GetViewerBalance("viewerone"));
-        Assert.Equal(10m, repository.GetViewerBalance("viewertwo"));
+        Assert.Equal(500m, repository.GetViewerBalance("viewerone"));
+        Assert.Equal(500m, repository.GetViewerBalance("viewertwo"));
     }
 
     [Fact]
@@ -63,7 +124,34 @@ public sealed class RefreshCommunityViewersActionTests : IDisposable
         Assert.Equal(1, result.RewardedViewerCount);
         Assert.Equal(1, result.ExpiredViewerCount);
         Assert.Empty(repository.GetActivePresence());
-        Assert.Equal(10m, repository.GetViewerBalance("lateviewer"));
+        Assert.Equal(500m, repository.GetViewerBalance("lateviewer"));
+    }
+
+    [Fact]
+    public void Execute_AwardsChatOnlyViewerAtBoundaryWhenChatExpiryContainsMilliseconds()
+    {
+        var repository = CreateRepository();
+        var recordAction = new RecordChatPresenceAction(repository);
+        var refreshAction = new RefreshCommunityViewersAction(repository, new WatchtimeCalculator(new RewardSettings()));
+        var messageReceivedAt = new DateTimeOffset(2026, 4, 23, 19, 59, 59, 500, TimeSpan.Zero);
+        var boundaryWithMilliseconds = new DateTimeOffset(2026, 4, 23, 20, 0, 0, 500, TimeSpan.Zero);
+
+        recordAction.Execute(
+            new ChatPresenceDto
+            {
+                Username = "streamer",
+                DisplayName = "Streamer",
+                MessageReceivedAtUtc = messageReceivedAt
+            },
+            boundaryWithMilliseconds);
+
+        var result = refreshAction.Execute(
+            new DateTimeOffset(2026, 4, 23, 20, 0, 0, TimeSpan.Zero),
+            Array.Empty<CommunityViewerDto>());
+
+        Assert.Equal(1, result.RewardedViewerCount);
+        Assert.Equal(1, result.ExpiredViewerCount);
+        Assert.Equal(500m, repository.GetViewerBalance("streamer"));
     }
 
     [Fact]
@@ -81,7 +169,7 @@ public sealed class RefreshCommunityViewersActionTests : IDisposable
             });
 
         Assert.Equal(1, result.RewardedViewerCount);
-        Assert.Equal(10m, repository.GetViewerBalance("duplicated"));
+        Assert.Equal(500m, repository.GetViewerBalance("duplicated"));
     }
 
     [Fact]
@@ -99,8 +187,8 @@ public sealed class RefreshCommunityViewersActionTests : IDisposable
             });
 
         Assert.Equal(2, result.RewardedViewerCount);
-        Assert.Equal(15m, repository.GetViewerBalance("tierone"));
-        Assert.Equal(30m, repository.GetViewerBalance("tierthree"));
+        Assert.Equal(750m, repository.GetViewerBalance("tierone"));
+        Assert.Equal(1500m, repository.GetViewerBalance("tierthree"));
     }
 
     [Fact]
@@ -170,7 +258,7 @@ public sealed class RefreshCommunityViewersActionTests : IDisposable
 
         Assert.True(result.Success);
         Assert.Equal("viewer-id-keep", repository.GetActivePresence().Single().Identity.TwitchUserId);
-        Assert.Equal(10m, repository.GetViewerBalance(new ViewerIdentity
+        Assert.Equal(500m, repository.GetViewerBalance(new ViewerIdentity
         {
             TwitchUserId = "viewer-id-keep",
             Username = "viewerkeep",
@@ -218,11 +306,11 @@ public sealed class RefreshCommunityViewersActionTests : IDisposable
         Assert.Equal("Refresh cycle applied.", firstResult.Message);
         Assert.Equal("Refresh cycle applied.", secondResult.Message);
         Assert.Equal(2, firstResult.RewardedViewerCount);
-        Assert.Equal(45m, firstResult.TotalPointsAwarded);
+        Assert.Equal(2250m, firstResult.TotalPointsAwarded);
         Assert.Equal(2, secondResult.RewardedViewerCount);
-        Assert.Equal(45m, secondResult.TotalPointsAwarded);
-        Assert.Equal(130m, viewerRepository.GetViewerBalance(tierOneViewer));
-        Assert.Equal(160m, viewerRepository.GetViewerBalance(tierThreeViewer));
+        Assert.Equal(2250m, secondResult.TotalPointsAwarded);
+        Assert.Equal(1600m, viewerRepository.GetViewerBalance(tierOneViewer));
+        Assert.Equal(3100m, viewerRepository.GetViewerBalance(tierThreeViewer));
         Assert.Equal(1, watchStreakRepository.GetViewerStreak(tierOneViewer)?.CurrentStreak);
         Assert.Equal(1, watchStreakRepository.GetViewerStreak(tierThreeViewer)?.CurrentStreak);
     }

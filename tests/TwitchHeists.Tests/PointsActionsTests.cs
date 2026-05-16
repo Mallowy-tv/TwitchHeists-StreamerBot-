@@ -18,6 +18,48 @@ public sealed class PointsActionsTests : IDisposable
     }
 
     [Fact]
+    public void AddPointsAction_RoundsPointAmountsToWholeNumbers()
+    {
+        var repository = CreateRepository();
+        var action = new AddPointsAction(repository);
+
+        var result = action.Execute(new PointsCommandDto
+        {
+            TargetUsername = "target",
+            TargetDisplayName = "Target",
+            Amount = 10.5m,
+            OccurredAtUtc = new DateTimeOffset(2026, 4, 25, 16, 0, 0, TimeSpan.Zero)
+        });
+
+        Assert.True(result.Success);
+        Assert.Equal(11m, repository.GetViewerBalance("target"));
+        Assert.Contains("11 points", result.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void GivePointsAction_RoundsPointAmountsToWholeNumbers()
+    {
+        SeedBalance("giver", 100m);
+        var repository = CreateRepository();
+        var action = new GivePointsAction(repository);
+
+        var result = action.Execute(new PointsCommandDto
+        {
+            SourceUsername = "giver",
+            SourceDisplayName = "Giver",
+            TargetUsername = "friend",
+            TargetDisplayName = "Friend",
+            Amount = 1.6m,
+            OccurredAtUtc = new DateTimeOffset(2026, 4, 25, 16, 0, 0, TimeSpan.Zero)
+        });
+
+        Assert.True(result.Success);
+        Assert.Equal(98m, repository.GetViewerBalance("giver"));
+        Assert.Equal(2m, repository.GetViewerBalance("friend"));
+        Assert.Contains("2 points", result.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void GivePointsAction_TransfersPointsFromSenderToRecipient()
     {
         SeedBalance("giver", 500m);

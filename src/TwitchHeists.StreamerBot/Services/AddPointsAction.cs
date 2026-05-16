@@ -1,5 +1,6 @@
 using System.Globalization;
 using TwitchHeists.Core.Models;
+using TwitchHeists.Core.Services;
 using TwitchHeists.Data.Sqlite.Repositories;
 using TwitchHeists.StreamerBot.Contracts;
 
@@ -16,7 +17,8 @@ public sealed class AddPointsAction
 
     public ActionResponseDto Execute(PointsCommandDto command)
     {
-        if (command.Amount <= 0)
+        var amount = PointValueNormalizer.Normalize(command.Amount);
+        if (amount <= 0)
         {
             return Failure("Point amount must be greater than zero.");
         }
@@ -30,23 +32,23 @@ public sealed class AddPointsAction
                 return Failure("There are no active viewers to award points to.");
             }
 
-            var updatedCount = viewerRepository.AddPoints(activeViewers, command.Amount, command.OccurredAtUtc);
+            var updatedCount = viewerRepository.AddPoints(activeViewers, amount, command.OccurredAtUtc);
             return new ActionResponseDto
             {
                 Success = true,
-                Message = $"{updatedCount} active viewers each received {command.Amount.ToString("0.##", CultureInfo.InvariantCulture)} points."
+                Message = $"{updatedCount} active viewers each received {amount.ToString("0", CultureInfo.InvariantCulture)} points."
             };
         }
 
         var targetViewer = CreateViewerIdentity(command.TargetTwitchUserId, command.TargetUsername, command.TargetDisplayName);
-        viewerRepository.AddPoints(targetViewer, command.Amount, command.OccurredAtUtc);
+        viewerRepository.AddPoints(targetViewer, amount, command.OccurredAtUtc);
         var updatedBalance = viewerRepository.GetViewerBalance(targetViewer);
         var targetName = string.IsNullOrWhiteSpace(command.TargetDisplayName) ? command.TargetUsername : command.TargetDisplayName;
 
         return new ActionResponseDto
         {
             Success = true,
-            Message = $"{targetName} received {command.Amount.ToString("0.##", CultureInfo.InvariantCulture)} points. Balance is now {updatedBalance.ToString("0.##", CultureInfo.InvariantCulture)}."
+            Message = $"{targetName} received {amount.ToString("0", CultureInfo.InvariantCulture)} points. Balance is now {updatedBalance.ToString("0", CultureInfo.InvariantCulture)}."
         };
     }
 

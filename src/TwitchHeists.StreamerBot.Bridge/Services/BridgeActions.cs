@@ -85,6 +85,55 @@ public sealed class BridgeActions
             () => runtimeFactory.CreateGetWatchtimeAction(installDirectory).Execute(Map(query)));
     }
 
+    public BridgeResult GetPoints(string installDirectory, BridgePointsQuery query)
+    {
+        return Execute(
+            installDirectory,
+            () => runtimeFactory.CreateGetPointsAction(installDirectory).Execute(Map(query)));
+    }
+
+    public BridgeResult GetLeaderboard(string installDirectory)
+    {
+        return Execute(
+            installDirectory,
+            () => runtimeFactory.CreateGetLeaderboardAction(installDirectory).Execute());
+    }
+
+    public BridgeResult RunRaffle(string installDirectory, BridgeRaffleCommand command)
+    {
+        var mappedCommand = Map(command);
+        mappedCommand.SingleWinner = false;
+
+        return Execute(
+            installDirectory,
+            () => runtimeFactory.CreateStartRaffleAction(installDirectory).Execute(mappedCommand));
+    }
+
+    public BridgeResult RunSingleWinnerRaffle(string installDirectory, BridgeRaffleCommand command)
+    {
+        var mappedCommand = Map(command);
+        mappedCommand.SingleWinner = true;
+
+        return Execute(
+            installDirectory,
+            () => runtimeFactory.CreateStartRaffleAction(installDirectory).Execute(mappedCommand));
+    }
+
+    public BridgeResult JoinRaffle(string installDirectory, BridgeRaffleCommand command)
+    {
+        var mappedCommand = Map(command);
+        return Execute(
+            installDirectory,
+            () => runtimeFactory.CreateJoinRaffleAction(installDirectory).Execute(mappedCommand));
+    }
+
+    public BridgeResult ResolveDueRaffles(string installDirectory, DateTimeOffset nowUtc)
+    {
+        return Execute(
+            installDirectory,
+            () => runtimeFactory.CreateResolveDueRafflesAction(installDirectory).Execute(nowUtc));
+    }
+
     public BridgeResult StartHeist(string installDirectory, BridgeHeistCommand command)
     {
         return Execute(
@@ -227,6 +276,33 @@ public sealed class BridgeActions
             TargetUsername = query.TargetUsername,
             TargetDisplayName = query.TargetDisplayName,
             OccurredAtUtc = query.OccurredAtUtc
+        };
+    }
+
+    private static PointsQueryDto Map(BridgePointsQuery query)
+    {
+        return new PointsQueryDto
+        {
+            RequesterTwitchUserId = query.RequesterTwitchUserId,
+            RequesterUsername = query.RequesterUsername,
+            RequesterDisplayName = query.RequesterDisplayName,
+            TargetTwitchUserId = query.TargetTwitchUserId,
+            TargetUsername = query.TargetUsername,
+            TargetDisplayName = query.TargetDisplayName,
+            OccurredAtUtc = query.OccurredAtUtc
+        };
+    }
+
+    private static RaffleCommandDto Map(BridgeRaffleCommand command)
+    {
+        return new RaffleCommandDto
+        {
+            SourceTwitchUserId = command.SourceTwitchUserId,
+            SourceUsername = command.SourceUsername,
+            SourceDisplayName = command.SourceDisplayName,
+            IsBroadcaster = command.IsBroadcaster,
+            WinnerPoints = command.WinnerPoints,
+            OccurredAtUtc = command.OccurredAtUtc
         };
     }
 

@@ -15,7 +15,7 @@ public sealed class MixedLoadScenarioRunner : IDisposable
     private const decimal SeedBalancePerViewer = 5_000m;
     private const decimal StarterStake = 100m;
     private const decimal JoinStake = 50m;
-    private const decimal RefreshPointsPerViewer = 10m;
+    private const decimal RefreshPointsPerViewer = 500m;
     private const decimal StreakPointsPerViewer = 100m;
     private const decimal SuccessfulPotMultiplier = 2m;
 
@@ -330,6 +330,7 @@ public sealed class MixedLoadScenarioRunner : IDisposable
                 "TenSecondReminderThreshold": "00:00:10",
                 "MinimumSuccessChance": 1.0,
                 "MaximumSuccessChance": 1.0,
+                "MinimumJoinAmount": 50.0,
                 "MaximumWinnerCount": 5,
                 "SuccessfulPotMultiplier": 2.0
               }

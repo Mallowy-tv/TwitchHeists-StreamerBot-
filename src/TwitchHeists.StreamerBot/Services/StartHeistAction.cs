@@ -1,5 +1,7 @@
+using System;
 using TwitchHeists.Core.Models;
 using TwitchHeists.Core.Options;
+using TwitchHeists.Core.Services;
 using TwitchHeists.Data.Sqlite.Repositories;
 using TwitchHeists.StreamerBot.Contracts;
 
@@ -20,7 +22,8 @@ public sealed class StartHeistAction
 
     public ActionResponseDto Execute(HeistCommandDto command)
     {
-        if (command.StakeAmount <= 0)
+        var stakeAmount = PointValueNormalizer.Normalize(command.StakeAmount);
+        if (stakeAmount <= 0)
         {
             return Failure("Stake amount must be greater than zero.");
         }
@@ -35,18 +38,26 @@ public sealed class StartHeistAction
         {
             heistRepository.StartRound(
                 CreateViewerIdentity(command),
-                command.StakeAmount,
+                stakeAmount,
                 command.OccurredAtUtc,
                 command.OccurredAtUtc.Add(heistSettings.JoinWindow));
 
             return new ActionResponseDto
             {
                 Success = true,
-                Message = messageComposer.ComposeStart(command.Username, command.StakeAmount, heistSettings.JoinWindow)
+                Message = messageComposer.ComposeStart(command.Username, stakeAmount, heistSettings.JoinWindow)
             };
         }
         catch (InvalidOperationException exception)
         {
+            if (string.Equals(
+                    exception.Message,
+                    HeistRepository.InsufficientBalanceForStakeMessage,
+                    StringComparison.Ordinal))
+            {
+                return Failure(messageComposer.ComposeInsufficientBalance(command.Username, stakeAmount));
+            }
+
             return Failure(exception.Message);
         }
     }

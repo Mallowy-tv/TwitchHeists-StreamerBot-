@@ -14,6 +14,6 @@ public sealed class PointsCalculator
 
     public decimal CalculateAward(TwitchSubscriberTier subscriberTier)
     {
-        return rewardSettings.BasePointsPerInterval * rewardSettings.GetMultiplier(subscriberTier);
+        return PointValueNormalizer.Normalize(rewardSettings.BasePointsPerInterval * rewardSettings.GetMultiplier(subscriberTier));
     }
 }

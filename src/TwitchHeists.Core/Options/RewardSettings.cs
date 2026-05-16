@@ -7,7 +7,7 @@ public sealed class RewardSettings
 {
     public TimeSpan RewardInterval { get; set; } = TimeSpan.FromMinutes(5);
 
-    public decimal BasePointsPerInterval { get; set; } = 10m;
+    public decimal BasePointsPerInterval { get; set; } = 500m;
 
     public decimal Tier1Multiplier { get; set; } = 1.5m;
 

@@ -26,7 +26,7 @@ public sealed class HeistResolver
             throw new InvalidOperationException("Cannot resolve a heist without participants.");
         }
 
-        var originalPot = participants.Sum(participant => participant.StakeAmount);
+        var originalPot = PointValueNormalizer.Normalize(participants.Sum(participant => participant.StakeAmount));
         if (participants.Count < heistSettings.MinimumPlayers)
         {
             return new HeistResolutionResult
@@ -78,7 +78,7 @@ public sealed class HeistResolver
             remainingParticipants.RemoveAt(randomIndex);
         }
 
-        var resolvedPot = originalPot * heistSettings.SuccessfulPotMultiplier;
+        var resolvedPot = PointValueNormalizer.Normalize(originalPot * heistSettings.SuccessfulPotMultiplier);
         AllocateWinnerPayouts(winners, resolvedPot);
 
         return new HeistResolutionResult
@@ -155,7 +155,12 @@ public sealed class HeistResolver
                 continue;
             }
 
-            var payout = Math.Round(resolvedPot * (winner.StakeAmount / totalWinnerStake), 2, MidpointRounding.AwayFromZero);
+            var payout = PointValueNormalizer.Normalize(resolvedPot * (winner.StakeAmount / totalWinnerStake));
+            if (payout > remainingPot)
+            {
+                payout = remainingPot;
+            }
+
             winner.PayoutAmount = payout;
             remainingPot -= payout;
         }

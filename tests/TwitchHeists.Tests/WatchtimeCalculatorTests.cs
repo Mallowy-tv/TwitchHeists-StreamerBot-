@@ -22,7 +22,7 @@ public sealed class WatchtimeCalculatorTests
         var reward = Assert.Single(result.Rewards);
         Assert.Equal("viewerone", reward.Identity.NormalizedUsername);
         Assert.Equal(5, reward.WatchMinutesAwarded);
-        Assert.Equal(10m, reward.PointsAwarded);
+        Assert.Equal(500m, reward.PointsAwarded);
         Assert.Empty(result.ExpiredPresence);
     }
 

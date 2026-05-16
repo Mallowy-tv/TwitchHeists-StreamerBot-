@@ -61,7 +61,7 @@ public sealed class BridgeActionsTests : IDisposable
         Assert.True(result.Success);
         Assert.Equal("Refresh cycle applied.", result.Message);
         Assert.Equal(1, result.RewardedViewerCount);
-        Assert.Equal(10m, result.TotalPointsAwarded);
+        Assert.Equal(500m, result.TotalPointsAwarded);
     }
 
     [Fact]
@@ -170,7 +170,28 @@ public sealed class BridgeActionsTests : IDisposable
             });
 
         Assert.True(result.Success);
-        Assert.Equal("starter started a heist with 100 points. Starting in 2 minutes.", result.Message);
+        Assert.Equal("starter started a heist with 100 points. Starting in 2 minutes. Use !join <points> to join the crew.", result.Message);
+    }
+
+    [Fact]
+    public void StartHeist_ReturnsTaggedInsufficientBalanceMessage()
+    {
+        EnsureInstallDirectory();
+        SeedBalance("starter", 50m, 0);
+        var actions = new BridgeActions();
+
+        var result = actions.StartHeist(
+            installDirectory,
+            new BridgeHeistCommand
+            {
+                Username = "starter",
+                DisplayName = "Starter",
+                StakeAmount = 100m,
+                OccurredAtUtc = new DateTimeOffset(2026, 4, 25, 16, 0, 0, TimeSpan.Zero)
+            });
+
+        Assert.False(result.Success);
+        Assert.Equal("@starter you need at least 100 points to join this heist.", result.Message);
     }
 
     [Fact]
@@ -536,7 +557,7 @@ public sealed class BridgeActionsTests : IDisposable
     public void ResolveDueHeists_UsesCustomTemplateFileForInsufficientCrewResultsAndLoadsMinimumParticipants()
     {
         EnsureInstallDirectory(
-            configurationJson: BuildHeistConfigurationJson(1.0m, 1.0m, minimumParticipants: 3),
+            configurationJson: BuildHeistConfigurationJson(1.0m, 1.0m, minimumParticipants: 3, minimumJoinAmount: 100m),
             messageTemplatesJson:
             """
             {
@@ -682,6 +703,105 @@ public sealed class BridgeActionsTests : IDisposable
         Assert.True(result.Success);
         Assert.Equal(1, CountOccurrences(result.Message, "CUSTOM CALLOUT"));
         Assert.Contains("CUSTOM SUMMARY", result.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RunRaffle_ModModeUsesConfiguredPointsLimit()
+    {
+        EnsureInstallDirectory();
+        SeedBalance("viewerone", 1000m, 0);
+        SeedBalance("viewertwo", 6500m, 0);
+        SeedBalance("viewerthree", 3000m, 0);
+        SeedActivePresence("viewerone", "ViewerOne");
+        SeedActivePresence("viewertwo", "ViewerTwo");
+        SeedActivePresence("viewerthree", "ViewerThree");
+        var actions = new BridgeActions();
+
+        var result = actions.RunRaffle(
+            installDirectory,
+            new BridgeRaffleCommand
+            {
+                SourceUsername = "moduser",
+                IsBroadcaster = false,
+                OccurredAtUtc = new DateTimeOffset(2026, 5, 16, 16, 0, 0, TimeSpan.Zero)
+            });
+
+        Assert.True(result.Success);
+        Assert.Contains("drawing in", result.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void RunSingleWinnerRaffle_StartsScheduledRound()
+    {
+        EnsureInstallDirectory();
+        SeedBalance("viewerone", 1000m, 0);
+        SeedBalance("viewertwo", 2500m, 0);
+        SeedBalance("viewerthree", 3000m, 0);
+        SeedBalance("viewerfour", 500m, 0);
+        SeedActivePresence("viewerone", "ViewerOne");
+        SeedActivePresence("viewertwo", "ViewerTwo");
+        SeedActivePresence("viewerthree", "ViewerThree");
+        SeedActivePresence("viewerfour", "ViewerFour");
+        var actions = new BridgeActions();
+
+        var result = actions.RunSingleWinnerRaffle(
+            installDirectory,
+            new BridgeRaffleCommand
+            {
+                SourceUsername = "streamer",
+                IsBroadcaster = true,
+                OccurredAtUtc = new DateTimeOffset(2026, 5, 16, 16, 0, 0, TimeSpan.Zero)
+            });
+
+        Assert.True(result.Success);
+        Assert.Contains("single-winner raffle", result.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ResolveDueRaffles_ReturnsCountdownAndThenResultMessage()
+    {
+        EnsureInstallDirectory();
+        SeedBalance("viewerone", 1000m, 0);
+        SeedBalance("viewertwo", 2500m, 0);
+        var actions = new BridgeActions();
+        var startedAt = new DateTimeOffset(2026, 5, 16, 16, 0, 0, TimeSpan.Zero);
+
+        var start = actions.RunSingleWinnerRaffle(
+            installDirectory,
+            new BridgeRaffleCommand
+            {
+                SourceUsername = "streamer",
+                IsBroadcaster = true,
+                WinnerPoints = 10000m,
+                OccurredAtUtc = startedAt
+            });
+        var joinOne = actions.JoinRaffle(
+            installDirectory,
+            new BridgeRaffleCommand
+            {
+                SourceUsername = "viewerone",
+                SourceDisplayName = "ViewerOne",
+                OccurredAtUtc = startedAt.AddSeconds(5)
+            });
+        var joinTwo = actions.JoinRaffle(
+            installDirectory,
+            new BridgeRaffleCommand
+            {
+                SourceUsername = "viewertwo",
+                SourceDisplayName = "ViewerTwo",
+                OccurredAtUtc = startedAt.AddSeconds(8)
+            });
+        var reminder = actions.ResolveDueRaffles(installDirectory, startedAt.AddMinutes(1));
+        var resolution = actions.ResolveDueRaffles(installDirectory, startedAt.AddMinutes(2));
+
+        Assert.True(start.Success);
+        Assert.True(joinOne.Success);
+        Assert.True(joinTwo.Success);
+        Assert.True(reminder.Success);
+        Assert.True(resolution.Success);
+        Assert.Contains("drawing in 1 minute", reminder.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("raffle", resolution.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("10000 points", resolution.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -872,6 +992,48 @@ public sealed class BridgeActionsTests : IDisposable
         Assert.Contains("2h 15m", result.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void GetPoints_ReturnsRequesterBalanceWhenNoTargetIsSupplied()
+    {
+        EnsureInstallDirectory();
+        SeedBalance("viewerone", 425m, 0);
+        var actions = new BridgeActions();
+
+        var result = actions.GetPoints(
+            installDirectory,
+            new BridgePointsQuery
+            {
+                RequesterUsername = "viewerone",
+                RequesterDisplayName = "ViewerOne",
+                OccurredAtUtc = new DateTimeOffset(2026, 5, 16, 16, 0, 0, TimeSpan.Zero)
+            });
+
+        Assert.True(result.Success);
+        Assert.Contains("425", result.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void GetPoints_ReturnsTargetBalanceWhenTargetIsProvided()
+    {
+        EnsureInstallDirectory();
+        SeedBalance("targetviewer", 775m, 0);
+        var actions = new BridgeActions();
+
+        var result = actions.GetPoints(
+            installDirectory,
+            new BridgePointsQuery
+            {
+                RequesterUsername = "viewerone",
+                RequesterDisplayName = "ViewerOne",
+                TargetUsername = "targetviewer",
+                TargetDisplayName = "TargetViewer",
+                OccurredAtUtc = new DateTimeOffset(2026, 5, 16, 16, 0, 0, TimeSpan.Zero)
+            });
+
+        Assert.True(result.Success);
+        Assert.Contains("775", result.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(installDirectory))
@@ -912,7 +1074,8 @@ public sealed class BridgeActionsTests : IDisposable
         decimal minimumSuccessChance,
         decimal maximumSuccessChance,
         int minimumParticipants = 2,
-        int maximumNamedResolutionCallouts = 2)
+        int maximumNamedResolutionCallouts = 2,
+        decimal minimumJoinAmount = 100m)
     {
         return
             $$"""
@@ -926,6 +1089,7 @@ public sealed class BridgeActionsTests : IDisposable
                 "MinimumSuccessChance": {{minimumSuccessChance.ToString(CultureInfo.InvariantCulture)}},
                 "MaximumSuccessChance": {{maximumSuccessChance.ToString(CultureInfo.InvariantCulture)}},
                 "MinimumParticipants": {{minimumParticipants}},
+                "MinimumJoinAmount": {{minimumJoinAmount.ToString(CultureInfo.InvariantCulture)}},
                 "MaximumWinnerCount": 5,
                 "MaximumNamedResolutionCallouts": {{maximumNamedResolutionCallouts}},
                 "SuccessfulPotMultiplier": 2.0

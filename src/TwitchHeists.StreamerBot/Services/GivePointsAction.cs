@@ -1,5 +1,6 @@
 using System.Globalization;
 using TwitchHeists.Core.Models;
+using TwitchHeists.Core.Services;
 using TwitchHeists.Data.Sqlite.Repositories;
 using TwitchHeists.StreamerBot.Contracts;
 
@@ -16,7 +17,8 @@ public sealed class GivePointsAction
 
     public ActionResponseDto Execute(PointsCommandDto command)
     {
-        if (command.Amount <= 0)
+        var amount = PointValueNormalizer.Normalize(command.Amount);
+        if (amount <= 0)
         {
             return Failure("Point amount must be greater than zero.");
         }
@@ -30,7 +32,7 @@ public sealed class GivePointsAction
 
         try
         {
-            viewerRepository.TransferPoints(sourceViewer, targetViewer, command.Amount, command.OccurredAtUtc);
+            viewerRepository.TransferPoints(sourceViewer, targetViewer, amount, command.OccurredAtUtc);
         }
         catch (InvalidOperationException exception)
         {
@@ -43,7 +45,7 @@ public sealed class GivePointsAction
         return new ActionResponseDto
         {
             Success = true,
-            Message = $"{sourceName} gave {command.Amount.ToString("0.##", CultureInfo.InvariantCulture)} points to {targetName}."
+            Message = $"{sourceName} gave {amount.ToString("0", CultureInfo.InvariantCulture)} points to {targetName}."
         };
     }
 

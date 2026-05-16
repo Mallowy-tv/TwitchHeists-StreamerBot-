@@ -23,8 +23,19 @@ public sealed class RefreshCommunityViewersAction
 
     public ActionResponseDto Execute(DateTimeOffset refreshTimestampUtc, IEnumerable<CommunityViewerDto> snapshot)
     {
-        var confirmedPresence = snapshot
+        var viewerSnapshot = snapshot.ToArray();
+        var placeholderUsernames = viewerSnapshot
+            .Where(viewer => LooksLikePlaceholder(viewer.Username))
+            .Select(viewer => viewer.Username.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var placeholderWarning = placeholderUsernames.Length > 0
+            ? $"Community refresh snapshot contains placeholder username '{placeholderUsernames[0]}'. Replace placeholder values with real Community viewer data."
+            : null;
+
+        var confirmedPresence = viewerSnapshot
             .Where(viewer => !string.IsNullOrWhiteSpace(viewer.Username))
+            .Where(viewer => !LooksLikePlaceholder(viewer.Username))
             .GroupBy(viewer => NormalizeUsername(viewer.Username), StringComparer.OrdinalIgnoreCase)
             .Select(group =>
             {
@@ -64,7 +75,7 @@ public sealed class RefreshCommunityViewersAction
             return new ActionResponseDto
             {
                 Success = true,
-                Message = "Refresh cycle was already applied.",
+                Message = BuildMessage("Refresh cycle was already applied.", placeholderWarning),
                 RewardedViewerCount = 0,
                 ExpiredViewerCount = 0,
                 TotalPointsAwarded = 0m
@@ -74,7 +85,7 @@ public sealed class RefreshCommunityViewersAction
         return new ActionResponseDto
         {
             Success = true,
-            Message = "Refresh cycle applied.",
+            Message = BuildMessage("Refresh cycle applied.", placeholderWarning),
             RewardedViewerCount = cycleResult.Rewards.Count,
             ExpiredViewerCount = cycleResult.ExpiredPresence.Count,
             TotalPointsAwarded = cycleResult.Rewards.Sum(reward => reward.PointsAwarded)
@@ -84,5 +95,23 @@ public sealed class RefreshCommunityViewersAction
     private static string NormalizeUsername(string username)
     {
         return username.Trim().ToLowerInvariant();
+    }
+
+    private static bool LooksLikePlaceholder(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        var trimmed = value!.Trim();
+        return trimmed.Length > 2 && trimmed.StartsWith("<", StringComparison.Ordinal) && trimmed.EndsWith(">", StringComparison.Ordinal);
+    }
+
+    private static string BuildMessage(string baseMessage, string? warning)
+    {
+        return string.IsNullOrWhiteSpace(warning)
+            ? baseMessage
+            : $"{warning} {baseMessage}";
     }
 }

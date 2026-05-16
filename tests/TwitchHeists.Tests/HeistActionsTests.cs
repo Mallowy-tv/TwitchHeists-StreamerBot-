@@ -35,7 +35,25 @@ public sealed class HeistActionsTests : IDisposable
         });
 
         Assert.True(result.Success);
-        Assert.Equal("starter started a heist with 100 points. Starting in 2 minutes.", result.Message);
+        Assert.Equal("starter started a heist with 100 points. Starting in 2 minutes. Use !join <points> to join the crew.", result.Message);
+    }
+
+    [Fact]
+    public void StartHeistAction_UsesTemplateForInsufficientBalanceAndTagsViewerByDefault()
+    {
+        SeedBalance("starter", 50m);
+        var action = CreateStartAction();
+
+        var result = action.Execute(new HeistCommandDto
+        {
+            Username = "starter",
+            DisplayName = "Starter",
+            StakeAmount = 100m,
+            OccurredAtUtc = new DateTimeOffset(2026, 4, 25, 16, 0, 0, TimeSpan.Zero)
+        });
+
+        Assert.False(result.Success);
+        Assert.Equal("@starter you need at least 100 points to join this heist.", result.Message);
     }
 
     [Fact]
@@ -174,7 +192,46 @@ public sealed class HeistActionsTests : IDisposable
         });
 
         Assert.True(result.Success);
-        Assert.Equal("renamedviewer started a heist with 100 points. Starting in 2 minutes.", result.Message);
+        Assert.Equal("renamedviewer started a heist with 100 points. Starting in 2 minutes. Use !join <points> to join the crew.", result.Message);
+    }
+
+    [Fact]
+    public void JoinHeistAction_ReservesStakeImmediatelyAndTracksJoinedBet()
+    {
+        SeedBalance("starter", 500m);
+        SeedBalance("backup", 500m);
+        var repository = CreateRepository();
+        var settings = CreateSettings();
+        settings.MinimumJoinAmount = 100m;
+        var startAction = CreateStartAction(repository, settings);
+        var joinAction = CreateJoinAction(repository, settings: settings);
+        var startedAt = new DateTimeOffset(2026, 4, 25, 16, 0, 0, TimeSpan.Zero);
+
+        startAction.Execute(new HeistCommandDto
+        {
+            Username = "starter",
+            DisplayName = "Starter",
+            StakeAmount = 100m,
+            OccurredAtUtc = startedAt
+        });
+
+        var joinResult = joinAction.Execute(new HeistCommandDto
+        {
+            Username = "backup",
+            DisplayName = "Backup",
+            StakeAmount = 100m,
+            OccurredAtUtc = startedAt.AddSeconds(10)
+        });
+
+        Assert.True(joinResult.Success);
+        Assert.Equal(400m, repository.GetViewerBalance("backup"));
+
+        var round = repository.GetOpenRound();
+        Assert.NotNull(round);
+        Assert.Equal(200m, round!.OriginalPot);
+
+        var joinedParticipant = repository.GetParticipants(round.RoundId).Single(participant => participant.Identity.NormalizedUsername == "backup");
+        Assert.Equal(100m, joinedParticipant.StakeAmount);
     }
 
     [Fact]
@@ -253,6 +310,122 @@ public sealed class HeistActionsTests : IDisposable
     }
 
     [Fact]
+    public void JoinHeistAction_UsesTemplateForInsufficientBalanceWhenJoining()
+    {
+        SeedBalance("starter", 500m);
+        SeedBalance("backup", 50m);
+        var repository = CreateRepository();
+        var settings = CreateSettings();
+        settings.MinimumJoinAmount = 100m;
+        var startAction = CreateStartAction(repository, settings);
+        var joinAction = CreateJoinAction(repository, settings: settings);
+        var startedAt = new DateTimeOffset(2026, 4, 25, 16, 0, 0, TimeSpan.Zero);
+
+        startAction.Execute(new HeistCommandDto
+        {
+            Username = "starter",
+            DisplayName = "Starter",
+            StakeAmount = 100m,
+            OccurredAtUtc = startedAt
+        });
+
+        var result = joinAction.Execute(new HeistCommandDto
+        {
+            Username = "backup",
+            DisplayName = "Backup",
+            StakeAmount = 100m,
+            OccurredAtUtc = startedAt.AddSeconds(10)
+        });
+
+        Assert.False(result.Success);
+        Assert.Equal("@backup you need at least 100 points to join this heist.", result.Message);
+    }
+
+    [Fact]
+    public void JoinHeistAction_UsesTemplateForAlreadyJoinedWhenJoiningTwice()
+    {
+        SeedBalance("starter", 500m);
+        SeedBalance("backup", 500m);
+        var repository = CreateRepository();
+        var settings = CreateSettings();
+        settings.MinimumJoinAmount = 100m;
+        var startAction = CreateStartAction(repository, settings);
+        var joinAction = CreateJoinAction(repository, settings: settings);
+        var startedAt = new DateTimeOffset(2026, 4, 25, 16, 0, 0, TimeSpan.Zero);
+
+        startAction.Execute(new HeistCommandDto
+        {
+            Username = "starter",
+            DisplayName = "Starter",
+            StakeAmount = 100m,
+            OccurredAtUtc = startedAt
+        });
+
+        var firstJoin = joinAction.Execute(new HeistCommandDto
+        {
+            Username = "backup",
+            DisplayName = "Backup",
+            StakeAmount = 100m,
+            OccurredAtUtc = startedAt.AddSeconds(10)
+        });
+
+        var secondJoin = joinAction.Execute(new HeistCommandDto
+        {
+            Username = "backup",
+            DisplayName = "Backup",
+            StakeAmount = 100m,
+            OccurredAtUtc = startedAt.AddSeconds(20)
+        });
+
+        Assert.True(firstJoin.Success);
+        Assert.False(secondJoin.Success);
+        Assert.Equal("@backup Viewer has already joined the open heist.", secondJoin.Message);
+    }
+
+    [Fact]
+    public void JoinHeistAction_UsesTemplateForMinimumJoinAmountWhenStakeIsTooLow()
+    {
+        SeedBalance("starter", 500m);
+        SeedBalance("backup", 5_000m);
+        var repository = CreateRepository();
+        var composer = CreateMessageComposer(new HeistMessageTemplates
+        {
+            StartMessages = new List<string> { "ACTION START {starter} {stake} {joinWindow}" },
+            CooldownMessages = new List<string> { "ACTION COOLDOWN {cooldownRemaining}" },
+            ReminderMessages = new List<string> { "ACTION REMINDER {countdown} {pot} {participantCount}" },
+            SuccessHeadlines = new List<string> { "ACTION SUCCESS HEADLINE" },
+            FailureHeadlines = new List<string> { "ACTION FAILURE HEADLINE" },
+            SuccessCallouts = new List<string> { "ACTION WINNER {winner} {payout}" },
+            FailureCallouts = new List<string> { "ACTION LOSER {loser}" },
+            SacrificeCallouts = new List<string> { "ACTION SACRIFICE {loser} {winner}" },
+            ResultSummaries = new List<string> { "ACTION SUMMARY {winnerCount} {loserCount} {resolvedPot} {successChancePercent}" },
+            MinimumJoinAmountMessages = new List<string> { "ACTION MINIMUM {viewer} {minimumJoinAmount}" }
+        });
+        var startAction = CreateStartAction(repository, messageComposer: composer);
+        var joinAction = CreateJoinAction(repository, messageComposer: composer);
+        var startedAt = new DateTimeOffset(2026, 4, 25, 16, 0, 0, TimeSpan.Zero);
+
+        startAction.Execute(new HeistCommandDto
+        {
+            Username = "starter",
+            DisplayName = "Starter",
+            StakeAmount = 100m,
+            OccurredAtUtc = startedAt
+        });
+
+        var result = joinAction.Execute(new HeistCommandDto
+        {
+            Username = "backup",
+            DisplayName = "Backup",
+            StakeAmount = 100m,
+            OccurredAtUtc = startedAt.AddSeconds(10)
+        });
+
+        Assert.False(result.Success);
+        Assert.Equal("ACTION MINIMUM backup 1000", result.Message);
+    }
+
+    [Fact]
     public void ResolveDueHeistsAction_KeepsLargeSuccessfulMessagesToOneNamedCallout()
     {
         SeedBalance("starter", 500m);
@@ -264,6 +437,7 @@ public sealed class HeistActionsTests : IDisposable
         var repository = CreateRepository();
         var settings = CreateSettings();
         settings.MinimumPlayers = 2;
+        settings.MinimumJoinAmount = 100m;
         settings.MaximumNamedResolutionCallouts = 1;
 
         var composer = CreateMessageComposer(new HeistMessageTemplates
@@ -279,7 +453,7 @@ public sealed class HeistActionsTests : IDisposable
             ResultSummaries = new List<string> { "ACTION SUMMARY {winnerCount} {loserCount} {resolvedPot} {successChancePercent}" }
         }, settings);
         var startAction = CreateStartAction(repository, settings, composer);
-        var joinAction = CreateJoinAction(repository);
+        var joinAction = CreateJoinAction(repository, settings: settings);
         var resolveAction = CreateResolveAction(repository, settings, composer);
         var startedAt = new DateTimeOffset(2026, 4, 25, 16, 0, 0, TimeSpan.Zero);
 
@@ -309,6 +483,52 @@ public sealed class HeistActionsTests : IDisposable
         Assert.True(result.Success);
         Assert.Equal(1, CountOccurrences(result.Message, "ACTION CALLOUT"));
         Assert.Contains("ACTION SUMMARY", result.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void HeistMessageComposer_DoesNotRepeatTheSameFailureCalloutTemplate()
+    {
+        var settings = CreateSettings();
+        settings.MaximumNamedResolutionCallouts = 2;
+        var composer = CreateMessageComposer(new HeistMessageTemplates
+        {
+            StartMessages = new List<string> { "ACTION START {starter} {stake} {joinWindow}" },
+            CooldownMessages = new List<string> { "ACTION COOLDOWN {cooldownRemaining}" },
+            ReminderMessages = new List<string> { "ACTION REMINDER {countdown} {pot} {participantCount}" },
+            SuccessHeadlines = new List<string> { "ACTION SUCCESS HEADLINE" },
+            FailureHeadlines = new List<string> { "ACTION FAILURE HEADLINE" },
+            SuccessCallouts = new List<string> { "ACTION WINNER {winner} {payout}" },
+            FailureCallouts = new List<string> { "ACTION LOSER {loser}" },
+            SacrificeCallouts = new List<string> { "ACTION SACRIFICE {loser} {winner}" },
+            ResultSummaries = new List<string> { "ACTION SUMMARY {winnerCount} {loserCount} {resolvedPot} {successChancePercent}" }
+        }, settings);
+
+        var result = composer.ComposeResolution(new HeistResolutionResult
+        {
+            RoundId = Guid.NewGuid(),
+            FinalState = HeistRoundState.ResolvedFailure,
+            SuccessChance = 0.5219m,
+            OriginalPot = 47000m,
+            ResolvedPot = 47000m,
+            Winners = Array.Empty<HeistParticipant>(),
+            Losers = new[]
+            {
+                new HeistParticipant
+                {
+                    Identity = new ViewerIdentity { Username = "firstloser", NormalizedUsername = "firstloser", DisplayName = "FirstLoser" },
+                    StakeAmount = 100m
+                },
+                new HeistParticipant
+                {
+                    Identity = new ViewerIdentity { Username = "secondloser", NormalizedUsername = "secondloser", DisplayName = "SecondLoser" },
+                    StakeAmount = 100m
+                }
+            },
+            RefundedParticipants = Array.Empty<HeistParticipant>(),
+            ResolvedAtUtc = new DateTimeOffset(2026, 4, 25, 16, 2, 0, TimeSpan.Zero)
+        });
+
+        Assert.Equal(1, CountOccurrences(result, "ACTION LOSER"));
     }
 
     public void Dispose()
@@ -350,9 +570,16 @@ public sealed class HeistActionsTests : IDisposable
             messageComposer ?? CreateMessageComposer(settings: resolvedSettings));
     }
 
-    private JoinHeistAction CreateJoinAction(HeistRepository? repository = null)
+    private JoinHeistAction CreateJoinAction(
+        HeistRepository? repository = null,
+        HeistMessageComposer? messageComposer = null,
+        HeistSettings? settings = null)
     {
-        return new JoinHeistAction(repository ?? CreateRepository());
+        var resolvedSettings = settings ?? CreateSettings();
+        return new JoinHeistAction(
+            repository ?? CreateRepository(),
+            resolvedSettings,
+            messageComposer ?? CreateMessageComposer(settings: resolvedSettings));
     }
 
     private static HeistSettings CreateSettings()
@@ -360,6 +587,7 @@ public sealed class HeistActionsTests : IDisposable
         return new HeistSettings
         {
             JoinWindow = TimeSpan.FromMinutes(2),
+            MinimumJoinAmount = 1000m,
             MaximumWinnerCount = 5,
             SuccessfulPotMultiplier = 2.0m
         };

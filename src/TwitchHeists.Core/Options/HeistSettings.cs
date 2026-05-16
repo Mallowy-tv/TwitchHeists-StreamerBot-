@@ -21,6 +21,8 @@ public sealed class HeistSettings
 
     public int MinimumPlayers { get; set; } = 2;
 
+    public decimal MinimumJoinAmount { get; set; } = 1000m;
+
     public int MinimumParticipants
     {
         get => MinimumPlayers;
