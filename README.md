@@ -1,24 +1,38 @@
 # TwitchHeists
 
-## ✨ What it is
+## 🎮 What this is
 
-TwitchHeists is a Streamer.bot add-on for watchtime, points, heists, raffles, and leaderboards backed by SQLite.
+TwitchHeists is a Twitch chat add-on that adds points, watchtime, heists, raffles, and a leaderboard.
 
-## 📦 What’s included
+It works with Streamer.bot and saves everything in a local SQLite database.
 
-- watchtime refresh and chat presence tracking
-- points commands and a points leaderboard
-- timed heists with joins, reminders, and adaptive resolutions
-- multi-winner and single-winner raffles
-- a root `TwitchHeists.txt` import file for Streamer.bot
+## ✅ What you get
 
-## 🚀 Install
+- viewer watchtime tracking
+- points commands
+- a points leaderboard
+- heists with joins and countdowns
+- raffles with one or many winners
 
-1. Build the solution in Release mode.
-2. Copy the bridge output from `src\TwitchHeists.StreamerBot.Bridge\bin\Release\net48\` into your Streamer.bot extensions folder.
-3. Import the root `TwitchHeists.txt` file into Streamer.bot.
+## 🚀 How to install
 
-## 🧭 Notes
+1. Download the release files from GitHub.
+2. Put them in your Streamer.bot extensions folder like this:
 
-- The root `TwitchHeists.txt` file contains the Streamer.bot import code.
-- Default configuration and setup details live in the deployed bridge folder.
+```text
+D:\Streamer Bot\Extensions\TwitchHeist\
+  TwitchHeists.txt
+  TwitchHeists.StreamerBot.Bridge.dll
+  TwitchHeists.StreamerBot.dll
+  TwitchHeists.Core.dll
+  TwitchHeists.Data.Sqlite.dll
+  appsettings.json
+  heist-messages.json
+```
+
+3. Import the file [TwitchHeists.txt](./TwitchHeists.txt) into Streamer.bot.
+
+## ℹ️ Notes
+
+- `TwitchHeists.txt` is the import file for Streamer.bot.
+- The rest of the setup lives in the files that come with the project.
