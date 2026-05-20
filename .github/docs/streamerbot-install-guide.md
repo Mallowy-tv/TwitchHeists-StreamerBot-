@@ -56,7 +56,7 @@ The bridge creates `data\` automatically on first use, but keeping an empty `dat
 
 ## 3. Tune settings if you want
 
-The default `appsettings.json` expects the SQLite database here:
+The current runtime always stores the SQLite database here, relative to the install folder:
 
 ```json
 {
@@ -66,12 +66,14 @@ The default `appsettings.json` expects the SQLite database here:
 }
 ```
 
+That entry still ships in `appsettings.json`, but the runtime does **not** read it when choosing the live database path. `BridgeRuntimeFactory` always creates and uses `<install-directory>\data\twitch-heists.db`, so editing `ConnectionStrings.TwitchHeists` does not move the database.
+
 You can also tune these values before first use:
 
 | Setting | Default | Meaning |
 |---|---|---|
 | `Rewards.RewardInterval` | `00:05:00` | Watchtime payout interval |
-| `Rewards.BasePointsPerInterval` | `10` | Base points every 5 minutes |
+| `Rewards.BasePointsPerInterval` | `500` | Base points every 5 minutes |
 | `Rewards.Tier1Multiplier` | `1.5` | Tier 1 subscriber multiplier |
 | `Rewards.Tier2Multiplier` | `2.0` | Tier 2 subscriber multiplier |
 | `Rewards.Tier3Multiplier` | `3.0` | Tier 3 subscriber multiplier |
@@ -93,6 +95,8 @@ You can also tune these values before first use:
 | `Raffle.TenSecondReminderThreshold` | `00:00:10` | When to send the 10-second raffle reminder |
 | `Raffle.WinnerPoints` | `5000` | Default points awarded to each raffle winner when command input omits amount |
 | `Raffle.ModeratorPointsLimit` | `5000` | Legacy moderator cap setting (raffle joins are free) |
+
+The shipped `appsettings.json` only includes the most common keys. If you want to override another supported value from this table, add that key manually and the runtime will use it instead of the code default.
 
 `heist-messages.json` sits beside `appsettings.json` in the same install folder and controls all heist chat output without rebuilding the project.
 

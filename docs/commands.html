@@ -7,187 +7,238 @@
   <link rel="stylesheet" href="assets/site.css">
   <script src="assets/site.js" defer></script>
 </head>
-<body>
-  <header class="site-header">
-    <div class="shell">
-      <a class="brand" href="index.html">Twitch<span>Heists</span> Docs</a>
-      <nav class="nav" aria-label="Primary">
-        <a href="index.html">Home</a>
-        <a href="install.html">Install</a>
-        <a class="active" href="commands.html">Commands</a>
-        <a href="streamerbot.html">Streamer.bot</a>
-        <a href="editing.html">Editing</a>
-        <a href="downloads.html">Downloads</a>
+<body class="docs-body">
+  <header class="topbar">
+    <div class="topbar-shell">
+      <a class="topbar-brand" href="index.html"><span class="topbar-brand-title">Twitch<span class="brand-heists">Heists</span></span> <span class="topbar-brand-suffix">Docs</span></a>
+      <nav class="topbar-nav" aria-label="Top navigation">
+        <a class="topbar-link" href="index.html">Get Started</a>
+        <a class="topbar-link active" href="commands.html">Commands</a>
+        <a class="topbar-link" href="streamerbot.html">Streamer.bot</a>
+        <a class="topbar-link" href="editing.html">Editing</a>
+        <a class="topbar-link" href="downloads.html">Downloads</a>
       </nav>
+      <div class="topbar-tools">
+        <a class="tool-pill" href="https://github.com/Mallowy-tv/TwitchHeists-StreamerBot-" target="_blank" rel="noreferrer">GitHub</a>
+      </div>
     </div>
   </header>
 
-  <main class="shell">
-    <section class="hero">
-      <div class="hero-card">
-        <div class="eyebrow">💬 Commands</div>
-        <h1>What chat can do and how the game rules work.</h1>
-        <p>This page keeps the public-facing behavior in one place: points, watchtime, raffles, heists, and the default settings that shape them.</p>
-      </div>
-    </section>
+  <div class="docs-shell">
+    <aside class="sidebar">
+      <nav class="sidebar-nav" aria-label="Primary">
+        <section class="sidebar-group">
+          <div class="sidebar-group-title sidebar-group-title-get-started">Get Started</div>
+          <div class="sidebar-subnav">
+            <a class="sidebar-link" href="index.html">Overview</a>
+            <a class="sidebar-link" href="install.html">Install</a>
+          </div>
+        </section>
 
-    <section class="section">
-      <article class="panel">
-        <h2>💰 Core chat commands</h2>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Command</th>
-                <th>What it does</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr><td><code>!points</code></td><td>Shows your own points balance.</td></tr>
-              <tr><td><code>!points &lt;user&gt;</code></td><td>Shows another viewer's balance.</td></tr>
-              <tr><td><code>!leaderboard</code></td><td>Shows the top 5 point balances in chat.</td></tr>
-              <tr><td><code>!watchtime</code></td><td>Shows your tracked lifetime watchtime.</td></tr>
-              <tr><td><code>!watchtime &lt;user&gt;</code></td><td>Shows another viewer's tracked lifetime watchtime.</td></tr>
-              <tr><td><code>!points give &lt;user&gt; &lt;amount&gt;</code></td><td>Lets a viewer transfer some of their own points to someone else.</td></tr>
-            </tbody>
-          </table>
+        <section class="sidebar-group">
+          <div class="sidebar-group-title sidebar-group-title-reference">Reference</div>
+          <div class="sidebar-subnav">
+            <a class="sidebar-link active" href="commands.html">Commands</a>
+            <a class="sidebar-link" href="streamerbot.html">Streamer.bot</a>
+            <a class="sidebar-link" href="editing.html">Editing</a>
+            <a class="sidebar-link" href="downloads.html">Downloads</a>
+          </div>
+        </section>
+      </nav>
+    </aside>
+
+    <div class="docs-main">
+      <main class="docs-content">
+        <section class="page-intro">
+          <div class="page-eyebrow">Commands</div>
+          <h1>What chat can do and how the game rules work</h1>
+          <p class="lead">Use this page as the command and behavior reference for points, watchtime, raffles, heists, and the defaults that shape them.</p>
+        </section>
+
+        <div class="content-stack">
+          <section class="panel" id="chat-commands">
+            <div class="section-label">Chat commands</div>
+            <h2>Use the everyday viewer commands for balances, watchtime, and transfers.</h2>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Command</th>
+                    <th>What it does</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td><code>!points</code></td><td>Shows your own points balance.</td></tr>
+                  <tr><td><code>!points &lt;user&gt;</code></td><td>Shows another viewer's balance.</td></tr>
+                  <tr><td><code>!leaderboard</code></td><td>Shows the top 5 point balances in chat.</td></tr>
+                  <tr><td><code>!watchtime</code></td><td>Shows your tracked lifetime watchtime.</td></tr>
+                  <tr><td><code>!watchtime &lt;user&gt;</code></td><td>Shows another viewer's tracked lifetime watchtime.</td></tr>
+                  <tr><td><code>!points give &lt;user&gt; &lt;amount&gt;</code></td><td>Lets a viewer transfer some of their own points to someone else.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="panel" id="mod-commands">
+            <div class="section-label">Mod and broadcaster commands</div>
+            <h2>Run admin point actions and start raffles or heists.</h2>
+            <div class="content-grid-2 stack-vertical">
+              <article class="mini-card">
+                <h3>Mod and broadcaster commands</h3>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Command</th>
+                        <th>What it does</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr><td><code>!points add &lt;user&gt; &lt;amount&gt;</code></td><td>Adds points to one viewer.</td></tr>
+                      <tr><td><code>!points remove &lt;user&gt; &lt;amount&gt;</code></td><td>Removes points from one viewer.</td></tr>
+                      <tr><td><code>!raffle</code></td><td>Starts a multi-winner raffle using the default raffle prize from settings.</td></tr>
+                      <tr><td><code>!raffle &lt;points&gt;</code></td><td>Starts a multi-winner raffle with a custom prize per winner.</td></tr>
+                      <tr><td><code>!sraffle</code></td><td>Starts a single-winner raffle using the default raffle prize from settings.</td></tr>
+                      <tr><td><code>!sraffle &lt;points&gt;</code></td><td>Starts a single-winner raffle with a custom prize.</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </article>
+
+              <article class="mini-card">
+                <h3>Join commands</h3>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Command</th>
+                        <th>What it does</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr><td><code>!heist &lt;amount&gt;</code></td><td>Starts a heist with the starting stake amount.</td></tr>
+                      <tr><td><code>!join &lt;amount&gt;</code></td><td>Joins the current heist with your own stake.</td></tr>
+                      <tr><td><code>!rjoin</code></td><td>Joins the current raffle for free.</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <section class="panel" id="rewards-raffles">
+            <div class="section-label">Rewards and raffles</div>
+            <h2>Review passive rewards separately from the raffle payout defaults.</h2>
+            <article class="mini-card stacked-card">
+              <section class="stacked-section">
+                <h3>Passive rewards</h3>
+                <p>With the default settings, TwitchHeists rewards active viewers every 5 minutes.</p>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Viewer type</th>
+                        <th>Multiplier</th>
+                        <th>Default points every 5 minutes</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr><td>Non-sub</td><td><code>x1.0</code></td><td><code>500</code></td></tr>
+                      <tr><td>Tier 1 sub</td><td><code>x1.5</code></td><td><code>750</code></td></tr>
+                      <tr><td>Tier 2 sub</td><td><code>x2.0</code></td><td><code>1000</code></td></tr>
+                      <tr><td>Tier 3 sub</td><td><code>x3.0</code></td><td><code>1500</code></td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p><code>!watchtime</code> shows lifetime rewarded watchtime, not just the current stream.</p>
+              </section>
+
+              <section class="stacked-section">
+                <h3>Raffle payout rules</h3>
+                <p>Raffle prizes use their own defaults and are not tied to subscriber tier bonuses.</p>
+                <ul>
+                  <li><code>!raffle</code> means multiple winners.</li>
+                  <li><code>!sraffle</code> means one winner only.</li>
+                  <li><code>!rjoin</code> is free.</li>
+                  <li>If you omit the amount, raffle commands fall back to <code>Raffle.WinnerPoints</code>.</li>
+                  <li>With the default config, that fallback is <strong>5000 points</strong>.</li>
+                </ul>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Entrants</th>
+                        <th>Winners</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr><td>1</td><td>1 winner</td></tr>
+                      <tr><td>2-10</td><td>About half the field wins</td></tr>
+                      <tr><td>11-20</td><td>About a quarter of the field wins</td></tr>
+                      <tr><td>21-50</td><td>About one fifth of the field wins</td></tr>
+                      <tr><td>51-200</td><td>About one eighth of the field wins</td></tr>
+                      <tr><td>201+</td><td>About 5% of the field wins</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            </article>
+          </section>
+
+          <section class="panel" id="heists">
+            <div class="section-label">Heists</div>
+            <h2>Understand the entry rules and the success chance model.</h2>
+            <div class="content-grid-2">
+              <article class="mini-card">
+                <h3>Heist rules</h3>
+                <ul>
+                  <li><code>!heist &lt;amount&gt;</code> starts the run with any positive stake.</li>
+                  <li><code>!join &lt;amount&gt;</code> joins the open run, but the default minimum join stake is <strong>1000 points</strong>.</li>
+                  <li>If a viewer does not have enough points, they cannot start or join.</li>
+                  <li>By default, a heist needs at least <strong>2 participants</strong>.</li>
+                  <li>After a heist resolves, the default cooldown is <strong>5 minutes</strong> before a new one can start.</li>
+                </ul>
+              </article>
+
+              <article class="mini-card">
+                <h3>Heist success chance</h3>
+                <ul>
+                  <li>The default maximum chance is <strong>75%</strong>.</li>
+                  <li>Every extra participant after the first adds <strong>3 percentage points</strong>.</li>
+                  <li>Larger total stakes lower the chance.</li>
+                  <li>The final chance is never allowed below <strong>40%</strong>.</li>
+                  <li>The final chance is never allowed above <strong>75%</strong>.</li>
+                </ul>
+              </article>
+            </div>
+          </section>
         </div>
-      </article>
-    </section>
 
-    <section class="section grid-2">
-      <article class="panel">
-        <h2>🛠️ Mod / broadcaster commands</h2>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Command</th>
-                <th>What it does</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr><td><code>!points add &lt;user&gt; &lt;amount&gt;</code></td><td>Adds points to one viewer.</td></tr>
-              <tr><td><code>!points remove &lt;user&gt; &lt;amount&gt;</code></td><td>Removes points from one viewer.</td></tr>
-              <tr><td><code>!raffle</code></td><td>Starts a multi-winner raffle using the default raffle prize from settings.</td></tr>
-              <tr><td><code>!raffle &lt;points&gt;</code></td><td>Starts a multi-winner raffle with a custom prize per winner.</td></tr>
-              <tr><td><code>!sraffle</code></td><td>Starts a single-winner raffle using the default raffle prize from settings.</td></tr>
-              <tr><td><code>!sraffle &lt;points&gt;</code></td><td>Starts a single-winner raffle with a custom prize.</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </article>
+        <footer class="footer-panel">
+          Want to tune these rules? Open <a href="editing.html">Editing</a> for the JSON settings and message files.
+        </footer>
+      </main>
 
-      <article class="panel">
-        <h2>🎯 Join commands</h2>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Command</th>
-                <th>What it does</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr><td><code>!heist &lt;amount&gt;</code></td><td>Starts a heist with the starting stake amount.</td></tr>
-              <tr><td><code>!join &lt;amount&gt;</code></td><td>Joins the current heist with your own stake.</td></tr>
-              <tr><td><code>!rjoin</code></td><td>Joins the current raffle for free.</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </article>
-    </section>
+      <aside class="page-toc">
+        <section class="page-toc-group">
+          <div class="page-toc-title">On this page</div>
+          <nav class="page-toc-nav" aria-label="On this page">
+            <a class="sidebar-link" href="#chat-commands">Chat commands</a>
+            <a class="sidebar-link" href="#mod-commands">Mod commands</a>
+            <a class="sidebar-link" href="#rewards-raffles">Rewards and raffles</a>
+            <a class="sidebar-link" href="#heists">Heists</a>
+          </nav>
+        </section>
 
-    <section class="section grid-2">
-      <article class="panel">
-        <h2>⏱️ Watchtime and subscriber bonuses</h2>
-        <p>With the default settings, TwitchHeists rewards active viewers every 5 minutes.</p>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Viewer type</th>
-                <th>Multiplier</th>
-                <th>Default points every 5 minutes</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr><td>Non-sub</td><td><code>x1.0</code></td><td><code>500</code></td></tr>
-              <tr><td>Tier 1 sub</td><td><code>x1.5</code></td><td><code>750</code></td></tr>
-              <tr><td>Tier 2 sub</td><td><code>x2.0</code></td><td><code>1000</code></td></tr>
-              <tr><td>Tier 3 sub</td><td><code>x3.0</code></td><td><code>1500</code></td></tr>
-            </tbody>
-          </table>
-        </div>
-        <p><code>!watchtime</code> shows lifetime rewarded watchtime, not just the current stream.</p>
-      </article>
-
-      <article class="panel">
-        <h2>🎉 Raffle rules</h2>
-        <ul>
-          <li><code>!raffle</code> = multiple winners.</li>
-          <li><code>!sraffle</code> = one winner only.</li>
-          <li><code>!rjoin</code> is free.</li>
-          <li>If you omit the amount, raffle commands fall back to <code>Raffle.WinnerPoints</code>.</li>
-          <li>With the default config, that fallback is <strong>5000 points</strong>.</li>
-        </ul>
-      </article>
-    </section>
-
-    <section class="section grid-2">
-      <article class="panel">
-        <h2>🏆 Multi-winner raffle tiers</h2>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Entrants</th>
-                <th>Winners</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr><td>1</td><td>1 winner</td></tr>
-              <tr><td>2-10</td><td>About half the field wins</td></tr>
-              <tr><td>11-20</td><td>About a quarter of the field wins</td></tr>
-              <tr><td>21-50</td><td>About one fifth of the field wins</td></tr>
-              <tr><td>51-200</td><td>About one eighth of the field wins</td></tr>
-              <tr><td>201+</td><td>About 5% of the field wins</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </article>
-
-      <article class="panel">
-        <h2>💣 Heist rules</h2>
-        <ul>
-          <li><code>!heist &lt;amount&gt;</code> starts the run.</li>
-          <li><code>!join &lt;amount&gt;</code> joins the open run.</li>
-          <li>Both commands require a real amount.</li>
-          <li>If a viewer does not have enough points, they cannot start or join.</li>
-          <li>By default, a heist needs at least <strong>2 participants</strong>.</li>
-        </ul>
-      </article>
-    </section>
-
-    <section class="section">
-      <article class="panel">
-        <h2>🎲 Heist success chance</h2>
-        <p>The heist chance is designed to get easier as more people join, but harder as the total stake gets bigger.</p>
-        <ul>
-          <li>The default maximum chance is <strong>75%</strong>.</li>
-          <li>Every extra participant after the first adds <strong>3 percentage points</strong>.</li>
-          <li>Larger total stakes lower the chance.</li>
-          <li>The final chance is never allowed below <strong>40%</strong>.</li>
-          <li>The final chance is never allowed above <strong>75%</strong>.</li>
-        </ul>
-      </article>
-    </section>
-  </main>
-
-  <footer class="footer">
-    <div class="shell">
-      Want to tune these rules? Open <a href="editing.html">Editing</a> for the JSON settings and message files.
+        <section class="page-toc-group">
+          <div class="page-toc-title">Repository</div>
+          <div class="meta-links">
+            <a class="meta-link" href="editing.html">JSON settings</a>
+            <a class="meta-link" href="downloads.html">Release files</a>
+          </div>
+        </section>
+      </aside>
     </div>
-  </footer>
+  </div>
 </body>
 </html>

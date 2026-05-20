@@ -23,8 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
           button.textContent = 'Copy';
           button.classList.remove('is-copied');
         }, 1500);
-      }
-      catch {
+      } catch {
         button.textContent = 'Failed';
 
         window.setTimeout(() => {
@@ -35,4 +34,40 @@ document.addEventListener('DOMContentLoaded', () => {
 
     block.appendChild(button);
   }
+
+  const tocLinks = [...document.querySelectorAll('.page-toc-nav a[href^="#"]')];
+  const sectionTargets = tocLinks
+    .map((link) => {
+      const href = link.getAttribute('href');
+      if (!href) {
+        return null;
+      }
+
+      const section = document.querySelector(href);
+      return section ? { link, section } : null;
+    })
+    .filter(Boolean);
+
+  if (sectionTargets.length === 0) {
+    return;
+  }
+
+  const updateActiveSection = () => {
+    const scrollPosition = window.scrollY + 140;
+    let active = sectionTargets[0];
+
+    for (const entry of sectionTargets) {
+      if (entry.section.offsetTop <= scrollPosition) {
+        active = entry;
+      }
+    }
+
+    for (const entry of sectionTargets) {
+      entry.link.classList.toggle('active', entry === active);
+    }
+  };
+
+  updateActiveSection();
+  window.addEventListener('scroll', updateActiveSection, { passive: true });
+  window.addEventListener('hashchange', updateActiveSection);
 });

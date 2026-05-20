@@ -7,107 +7,159 @@
   <link rel="stylesheet" href="assets/site.css">
   <script src="assets/site.js" defer></script>
 </head>
-<body>
-  <header class="site-header">
-    <div class="shell">
-      <a class="brand" href="index.html">Twitch<span>Heists</span> Docs</a>
-      <nav class="nav" aria-label="Primary">
-        <a href="index.html">Home</a>
-        <a href="install.html">Install</a>
-        <a href="commands.html">Commands</a>
-        <a class="active" href="streamerbot.html">Streamer.bot</a>
-        <a href="editing.html">Editing</a>
-        <a href="downloads.html">Downloads</a>
+<body class="docs-body">
+  <header class="topbar">
+    <div class="topbar-shell">
+      <a class="topbar-brand" href="index.html"><span class="topbar-brand-title">Twitch<span class="brand-heists">Heists</span></span> <span class="topbar-brand-suffix">Docs</span></a>
+      <nav class="topbar-nav" aria-label="Top navigation">
+        <a class="topbar-link" href="index.html">Get Started</a>
+        <a class="topbar-link" href="commands.html">Commands</a>
+        <a class="topbar-link active" href="streamerbot.html">Streamer.bot</a>
+        <a class="topbar-link" href="editing.html">Editing</a>
+        <a class="topbar-link" href="downloads.html">Downloads</a>
       </nav>
+      <div class="topbar-tools">
+        <a class="tool-pill" href="https://github.com/Mallowy-tv/TwitchHeists-StreamerBot-" target="_blank" rel="noreferrer">GitHub</a>
+      </div>
     </div>
   </header>
 
-  <main class="shell">
-    <section class="hero">
-      <div class="hero-card">
-        <div class="eyebrow">🤖 Streamer.bot</div>
-        <h1>How the extension and the import file fit together.</h1>
-        <p>TwitchHeists has two moving pieces in Streamer.bot: the extension files in your install folder, and the imported action definitions in <code>TwitchHeists.txt</code>.</p>
-      </div>
-    </section>
+  <div class="docs-shell">
+    <aside class="sidebar">
+      <nav class="sidebar-nav" aria-label="Primary">
+        <section class="sidebar-group">
+          <div class="sidebar-group-title sidebar-group-title-get-started">Get Started</div>
+          <div class="sidebar-subnav">
+            <a class="sidebar-link" href="index.html">Overview</a>
+            <a class="sidebar-link" href="install.html">Install</a>
+          </div>
+        </section>
 
-    <section class="section grid-2">
-      <article class="panel">
-        <h2>📂 The extension folder</h2>
-        <p>Your Streamer.bot extension folder holds the DLLs, support files, JSON config, local database, and runtimes needed at runtime.</p>
-        <pre><code>D:\Streamer Bot\Extensions\TwitchHeist\</code></pre>
-        <ul>
-          <li><code>TwitchHeists.StreamerBot.Bridge.dll</code> is the main DLL Streamer.bot loads.</li>
-          <li>The other TwitchHeists DLLs and support DLLs sit beside it as dependencies.</li>
-          <li><code>data\</code> stores your saved points, watchtime, and game history.</li>
-        </ul>
-      </article>
+        <section class="sidebar-group">
+          <div class="sidebar-group-title sidebar-group-title-reference">Reference</div>
+          <div class="sidebar-subnav">
+            <a class="sidebar-link" href="commands.html">Commands</a>
+            <a class="sidebar-link active" href="streamerbot.html">Streamer.bot</a>
+            <a class="sidebar-link" href="editing.html">Editing</a>
+            <a class="sidebar-link" href="downloads.html">Downloads</a>
+          </div>
+        </section>
+      </nav>
+    </aside>
 
-      <article class="panel">
-        <h2>📥 The import file</h2>
-        <p><code>TwitchHeists.txt</code> contains the Streamer.bot actions and command wiring.</p>
-        <ul>
-          <li>Import it inside Streamer.bot after your extension files are in place.</li>
-          <li>Re-import it when the action definitions themselves change.</li>
-          <li>Simple JSON setting changes do not require re-importing it.</li>
-        </ul>
-      </article>
-    </section>
+    <div class="docs-main">
+      <main class="docs-content">
+        <section class="page-intro">
+          <div class="page-eyebrow">Streamer.bot</div>
+          <h1>How the extension files and import file fit together</h1>
+          <p class="lead">TwitchHeists has two moving pieces in Streamer.bot: the extension files in your install folder and the imported action definitions in <code>TwitchHeists.txt</code>.</p>
+        </section>
 
-    <section class="section">
-      <article class="panel">
-        <h2>🔄 Normal runtime flow</h2>
-        <ol>
-          <li>Streamer.bot receives a chat command or timer event.</li>
-          <li>The imported action loads the bridge assembly from your install folder.</li>
-          <li>The bridge reads the local JSON settings and local database.</li>
-          <li>TwitchHeists resolves the command or scheduled reward.</li>
-          <li>Streamer.bot sends the result back to chat.</li>
-        </ol>
-      </article>
-    </section>
+        <div class="content-stack">
+          <section class="panel" id="extension-runtime">
+            <div class="section-label">Extension and import</div>
+            <h2>Know what lives in the folder and what gets imported separately.</h2>
+            <div class="content-grid-2 stack-vertical">
+              <article class="mini-card">
+                <h3>The extension folder</h3>
+                <p>Your Streamer.bot extension folder holds the DLLs, support files, JSON config, local database, and runtimes needed at runtime.</p>
+                <pre><code>D:\Streamer Bot\Extensions\TwitchHeist\</code></pre>
+                <ul>
+                  <li><code>TwitchHeists.StreamerBot.Bridge.dll</code> is the main DLL Streamer.bot loads.</li>
+                  <li>The other TwitchHeists DLLs and support DLLs sit beside it as dependencies.</li>
+                  <li><code>data\</code> stores your saved points, watchtime, and game history.</li>
+                </ul>
+              </article>
 
-    <section class="section grid-2">
-      <article class="panel">
-        <h2>👥 Viewer tracking matters</h2>
-        <p>Rewards and watchtime depend on Streamer.bot knowing who is currently present in chat. Turn on:</p>
-        <pre><code>Platforms &gt; Twitch &gt; Present Viewers &gt; Live Update</code></pre>
-        <p>Without that, the active-viewer refresh flow cannot keep balances and watchtime as accurate.</p>
-      </article>
+              <article class="mini-card">
+                <h3>The import file</h3>
+                <p><code>TwitchHeists.txt</code> contains the Streamer.bot actions and command wiring.</p>
+                <ul>
+                  <li>Import it inside Streamer.bot after your extension files are in place.</li>
+                  <li>Re-import it when the action definitions themselves change.</li>
+                  <li>Simple JSON setting changes do not require re-importing it.</li>
+                </ul>
+              </article>
+            </div>
+          </section>
 
-      <article class="panel">
-        <h2>🧾 When to re-import vs when to just copy files</h2>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Change</th>
-                <th>What to do</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr><td>DLL update</td><td>Copy the new extension output into the folder.</td></tr>
-              <tr><td><code>appsettings.json</code> change</td><td>Copy or edit the JSON file only.</td></tr>
-              <tr><td><code>heist-messages.json</code> change</td><td>Copy or edit the JSON file only.</td></tr>
-              <tr><td><code>TwitchHeists.txt</code> change</td><td>Re-import the file in Streamer.bot.</td></tr>
-            </tbody>
-          </table>
+          <section class="panel" id="runtime-flow">
+            <div class="section-label">Runtime flow</div>
+            <h2>Trace what happens from a chat command to the response in chat.</h2>
+            <ol>
+              <li>Streamer.bot receives a chat command or timer event.</li>
+              <li>The imported action loads the bridge assembly from your install folder.</li>
+              <li>The bridge reads the JSON settings and runtime data from the same extension location.</li>
+              <li>TwitchHeists resolves the command, updates data, and sends back the formatted chat message.</li>
+            </ol>
+          </section>
+
+          <section class="panel" id="viewer-tracking">
+            <div class="section-label">Viewer tracking</div>
+            <h2>Understand the live viewer dependency for passive rewards.</h2>
+            <div class="callout warning">
+              Passive points and watchtime depend on Streamer.bot keeping the present viewers list fresh during a live stream.
+            </div>
+            <ul>
+              <li>Enable <strong>Platforms &gt; Twitch &gt; Present Viewers &gt; Live Update</strong>.</li>
+              <li>That viewer list is what the timer-driven rewards use to know who is currently active.</li>
+              <li>If it is off, your passive reward cycle will not behave like the public docs describe.</li>
+            </ul>
+          </section>
+
+          <section class="panel" id="update-rules">
+            <div class="section-label">Update rules</div>
+            <h2>Know when you need a copy-only update and when you need to re-import.</h2>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Change type</th>
+                    <th>What to do</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td>DLL or code change</td><td>Copy the new release output into the extension folder.</td></tr>
+                  <tr><td><code>appsettings.json</code> change</td><td>Copy or edit the JSON file only.</td></tr>
+                  <tr><td><code>heist-messages.json</code> change</td><td>Copy or edit the JSON file only.</td></tr>
+                  <tr><td><code>TwitchHeists.txt</code> change</td><td>Re-import the file in Streamer.bot.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="section-label">Reference</div>
+            <h2>Use the deeper setup guide when you need lower-level wiring details.</h2>
+            <p>If you want the lower-level Streamer.bot wiring details and action snippet reference, use the detailed Streamer.bot install guide that ships with the repository.</p>
+          </section>
         </div>
-      </article>
-    </section>
 
-    <section class="section">
-      <article class="panel">
-        <h2>📘 Deeper setup reference</h2>
-        <p>If you want the lower-level Streamer.bot wiring details and action snippet reference, use the detailed Streamer.bot install guide that ships with the repository.</p>
-      </article>
-    </section>
-  </main>
+        <footer class="footer-panel">
+          Need a clean install path? Start on <a href="install.html">Install</a>. Need to tune behavior? Open <a href="editing.html">Editing</a>.
+        </footer>
+      </main>
 
-  <footer class="footer">
-    <div class="shell">
-      Need a clean install path? Start on <a href="install.html">Install</a>. Need to tune behavior? Open <a href="editing.html">Editing</a>.
+      <aside class="page-toc">
+        <section class="page-toc-group">
+          <div class="page-toc-title">On this page</div>
+          <nav class="page-toc-nav" aria-label="On this page">
+            <a class="sidebar-link" href="#extension-runtime">Extension and import</a>
+            <a class="sidebar-link" href="#runtime-flow">Runtime flow</a>
+            <a class="sidebar-link" href="#viewer-tracking">Viewer tracking</a>
+            <a class="sidebar-link" href="#update-rules">Update rules</a>
+          </nav>
+        </section>
+
+        <section class="page-toc-group">
+          <div class="page-toc-title">Repository</div>
+          <div class="meta-links">
+            <a class="meta-link" href="install.html">Install guide</a>
+            <a class="meta-link" href="downloads.html">Release files</a>
+          </div>
+        </section>
+      </aside>
     </div>
-  </footer>
+  </div>
 </body>
 </html>

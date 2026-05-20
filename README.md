@@ -146,10 +146,11 @@ Heists are a risk-and-reward game where viewers put their own points into the po
 
 ### 🚪 Starting and joining
 
-- `!heist <amount>` starts the run
-- `!join <amount>` joins the open run
-- both commands require a real amount
+- `!heist <amount>` starts the run with any positive stake
+- `!join <amount>` joins the open run, but must meet `Heist.MinimumJoinAmount`
 - if a viewer does not have enough points, they cannot start or join
+- with the default config, `!join` needs at least **1000 points**
+- after a heist resolves, the default cooldown before the next start is **5 minutes**
 
 ### 🎲 Heist success chance
 
@@ -206,9 +207,11 @@ The shipped defaults are:
 ### 💣 Heist
 
 - join window: **2 minutes**
+- cooldown window: **5 minutes**
 - minimum success chance: **40%**
 - maximum success chance: **75%**
 - minimum participants: **2**
+- minimum join amount for `!join`: **1000**
 - successful pot multiplier: **2x**
 
 ### 🎟️ Raffle
