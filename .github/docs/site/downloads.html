@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Downloads | TwitchHeists Docs</title>
+  <link rel="stylesheet" href="assets/site.css">
+  <script src="assets/site.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="shell">
+      <a class="brand" href="index.html">Twitch<span>Heists</span> Docs</a>
+      <nav class="nav" aria-label="Primary">
+        <a href="index.html">Home</a>
+        <a href="install.html">Install</a>
+        <a href="commands.html">Commands</a>
+        <a href="streamerbot.html">Streamer.bot</a>
+        <a href="editing.html">Editing</a>
+        <a class="active" href="downloads.html">Downloads</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="hero">
+      <div class="hero-card">
+        <div class="eyebrow">⬇️ Downloads</div>
+        <h1>Where to get releases, what to copy, and which paths matter.</h1>
+        <p>Use this page when you want the fastest possible answer to “where do I get the files?”</p>
+      </div>
+    </section>
+
+    <section class="section grid-2">
+      <article class="panel">
+        <h2>🌐 GitHub links</h2>
+        <ul>
+          <li><a href="https://github.com/Mallowy-tv/TwitchHeists-StreamerBot-/releases/latest">Latest release</a></li>
+          <li><a href="https://github.com/Mallowy-tv/TwitchHeists-StreamerBot-/releases">All releases</a></li>
+          <li><a href="https://github.com/Mallowy-tv/TwitchHeists-StreamerBot-">Repository home</a></li>
+        </ul>
+      </article>
+
+      <article class="panel">
+        <h2>📁 Local build output</h2>
+        <p>The deployable extension payload comes from:</p>
+        <pre><code>src\TwitchHeists.StreamerBot.Bridge\bin\Release\net48\</code></pre>
+        <p>The Streamer.bot import file lives at:</p>
+        <pre><code>TwitchHeists.txt</code></pre>
+      </article>
+    </section>
+
+    <section class="section">
+      <article class="panel">
+        <h2>📦 What you normally deploy</h2>
+        <ul>
+          <li>The full bridge release output folder contents</li>
+          <li>The <code>runtimes\</code> folder inside that output</li>
+          <li>The JSON files that live beside the DLLs</li>
+          <li><code>TwitchHeists.txt</code> imported separately in Streamer.bot</li>
+        </ul>
+      </article>
+    </section>
+
+    <section class="section grid-2">
+      <article class="panel">
+        <h2>🗂️ Main TwitchHeists files</h2>
+        <ul>
+          <li><code>TwitchHeists.StreamerBot.Bridge.dll</code></li>
+          <li><code>TwitchHeists.StreamerBot.dll</code></li>
+          <li><code>TwitchHeists.Core.dll</code></li>
+          <li><code>TwitchHeists.Data.Sqlite.dll</code></li>
+          <li><code>appsettings.json</code></li>
+          <li><code>heist-messages.json</code></li>
+        </ul>
+      </article>
+
+      <article class="panel">
+        <h2>📘 Related repo docs</h2>
+        <ul>
+          <li><code>README.md</code> — public quick overview</li>
+          <li>Detailed Streamer.bot install guide — lower-level wiring reference in the repository</li>
+          <li><code>install-streamerbot-extension.ps1</code> — local deploy helper included in the repository</li>
+        </ul>
+      </article>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="shell">
+      If you just want to get running, go back to <a href="install.html">Install</a>.
+    </div>
+  </footer>
+</body>
+</html>

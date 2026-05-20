@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Streamer.bot | TwitchHeists Docs</title>
+  <link rel="stylesheet" href="assets/site.css">
+  <script src="assets/site.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="shell">
+      <a class="brand" href="index.html">Twitch<span>Heists</span> Docs</a>
+      <nav class="nav" aria-label="Primary">
+        <a href="index.html">Home</a>
+        <a href="install.html">Install</a>
+        <a href="commands.html">Commands</a>
+        <a class="active" href="streamerbot.html">Streamer.bot</a>
+        <a href="editing.html">Editing</a>
+        <a href="downloads.html">Downloads</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="hero">
+      <div class="hero-card">
+        <div class="eyebrow">🤖 Streamer.bot</div>
+        <h1>How the extension and the import file fit together.</h1>
+        <p>TwitchHeists has two moving pieces in Streamer.bot: the extension files in your install folder, and the imported action definitions in <code>TwitchHeists.txt</code>.</p>
+      </div>
+    </section>
+
+    <section class="section grid-2">
+      <article class="panel">
+        <h2>📂 The extension folder</h2>
+        <p>Your Streamer.bot extension folder holds the DLLs, support files, JSON config, local database, and runtimes needed at runtime.</p>
+        <pre><code>D:\Streamer Bot\Extensions\TwitchHeist\</code></pre>
+        <ul>
+          <li><code>TwitchHeists.StreamerBot.Bridge.dll</code> is the main DLL Streamer.bot loads.</li>
+          <li>The other TwitchHeists DLLs and support DLLs sit beside it as dependencies.</li>
+          <li><code>data\</code> stores your saved points, watchtime, and game history.</li>
+        </ul>
+      </article>
+
+      <article class="panel">
+        <h2>📥 The import file</h2>
+        <p><code>TwitchHeists.txt</code> contains the Streamer.bot actions and command wiring.</p>
+        <ul>
+          <li>Import it inside Streamer.bot after your extension files are in place.</li>
+          <li>Re-import it when the action definitions themselves change.</li>
+          <li>Simple JSON setting changes do not require re-importing it.</li>
+        </ul>
+      </article>
+    </section>
+
+    <section class="section">
+      <article class="panel">
+        <h2>🔄 Normal runtime flow</h2>
+        <ol>
+          <li>Streamer.bot receives a chat command or timer event.</li>
+          <li>The imported action loads the bridge assembly from your install folder.</li>
+          <li>The bridge reads the local JSON settings and local database.</li>
+          <li>TwitchHeists resolves the command or scheduled reward.</li>
+          <li>Streamer.bot sends the result back to chat.</li>
+        </ol>
+      </article>
+    </section>
+
+    <section class="section grid-2">
+      <article class="panel">
+        <h2>👥 Viewer tracking matters</h2>
+        <p>Rewards and watchtime depend on Streamer.bot knowing who is currently present in chat. Turn on:</p>
+        <pre><code>Platforms &gt; Twitch &gt; Present Viewers &gt; Live Update</code></pre>
+        <p>Without that, the active-viewer refresh flow cannot keep balances and watchtime as accurate.</p>
+      </article>
+
+      <article class="panel">
+        <h2>🧾 When to re-import vs when to just copy files</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Change</th>
+                <th>What to do</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>DLL update</td><td>Copy the new extension output into the folder.</td></tr>
+              <tr><td><code>appsettings.json</code> change</td><td>Copy or edit the JSON file only.</td></tr>
+              <tr><td><code>heist-messages.json</code> change</td><td>Copy or edit the JSON file only.</td></tr>
+              <tr><td><code>TwitchHeists.txt</code> change</td><td>Re-import the file in Streamer.bot.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+    </section>
+
+    <section class="section">
+      <article class="panel">
+        <h2>📘 Deeper setup reference</h2>
+        <p>If you want the lower-level Streamer.bot wiring details and action snippet reference, use the detailed Streamer.bot install guide that ships with the repository.</p>
+      </article>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="shell">
+      Need a clean install path? Start on <a href="install.html">Install</a>. Need to tune behavior? Open <a href="editing.html">Editing</a>.
+    </div>
+  </footer>
+</body>
+</html>

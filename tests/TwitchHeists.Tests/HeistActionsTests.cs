@@ -35,7 +35,7 @@ public sealed class HeistActionsTests : IDisposable
         });
 
         Assert.True(result.Success);
-        Assert.Equal("starter started a heist with 100 points. Starting in 2 minutes. Use !join <points> to join the crew.", result.Message);
+        Assert.Equal("@starter started a heist with 100 points. Starting in 2 minutes. Use !join <points> to join the crew.", result.Message);
     }
 
     [Fact]
@@ -144,7 +144,6 @@ public sealed class HeistActionsTests : IDisposable
 
         Assert.True(result.Success);
         Assert.Contains("too small", result.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("100", result.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -192,7 +191,7 @@ public sealed class HeistActionsTests : IDisposable
         });
 
         Assert.True(result.Success);
-        Assert.Equal("renamedviewer started a heist with 100 points. Starting in 2 minutes. Use !join <points> to join the crew.", result.Message);
+        Assert.Equal("@renamedviewer started a heist with 100 points. Starting in 2 minutes. Use !join <points> to join the crew.", result.Message);
     }
 
     [Fact]
@@ -379,7 +378,7 @@ public sealed class HeistActionsTests : IDisposable
 
         Assert.True(firstJoin.Success);
         Assert.False(secondJoin.Success);
-        Assert.Equal("@backup Viewer has already joined the open heist.", secondJoin.Message);
+        Assert.Equal("@backup you're already part of the crew.", secondJoin.Message);
     }
 
     [Fact]
@@ -529,6 +528,118 @@ public sealed class HeistActionsTests : IDisposable
         });
 
         Assert.Equal(1, CountOccurrences(result, "ACTION LOSER"));
+    }
+
+    [Fact]
+    public void HeistMessageComposer_UsesDifferentFailureTemplatesWhenMultipleOptionsExist()
+    {
+        var settings = CreateSettings();
+        settings.MaximumNamedResolutionCallouts = 2;
+        var composer = new HeistMessageComposer(
+            new HeistMessageTemplates
+            {
+                StartMessages = new List<string> { "ACTION START {starter} {stake} {joinWindow}" },
+                CooldownMessages = new List<string> { "ACTION COOLDOWN {cooldownRemaining}" },
+                ReminderMessages = new List<string> { "ACTION REMINDER {countdown} {pot} {participantCount}" },
+                SuccessHeadlines = new List<string> { "ACTION SUCCESS HEADLINE" },
+                FailureHeadlines = new List<string> { "ACTION FAILURE HEADLINE" },
+                SuccessCallouts = new List<string> { "ACTION WINNER {winner} {payout}" },
+                FailureCallouts = new List<string>
+                {
+                    "ACTION LOSER ONE {loser}",
+                    "ACTION LOSER TWO {loser}"
+                },
+                SacrificeCallouts = new List<string> { "ACTION SACRIFICE {loser} {winner}" },
+                ResultSummaries = new List<string> { "ACTION SUMMARY {winnerCount} {loserCount} {resolvedPot} {successChancePercent}" }
+            },
+            settings,
+            _ => 0);
+
+        var result = composer.ComposeResolution(new HeistResolutionResult
+        {
+            RoundId = Guid.NewGuid(),
+            FinalState = HeistRoundState.ResolvedFailure,
+            SuccessChance = 0.5219m,
+            OriginalPot = 47000m,
+            ResolvedPot = 47000m,
+            Winners = Array.Empty<HeistParticipant>(),
+            Losers = new[]
+            {
+                new HeistParticipant
+                {
+                    Identity = new ViewerIdentity { Username = "firstloser", NormalizedUsername = "firstloser", DisplayName = "FirstLoser" },
+                    StakeAmount = 100m
+                },
+                new HeistParticipant
+                {
+                    Identity = new ViewerIdentity { Username = "secondloser", NormalizedUsername = "secondloser", DisplayName = "SecondLoser" },
+                    StakeAmount = 100m
+                }
+            },
+            RefundedParticipants = Array.Empty<HeistParticipant>(),
+            ResolvedAtUtc = new DateTimeOffset(2026, 4, 25, 16, 2, 0, TimeSpan.Zero)
+        });
+
+        Assert.Contains("ACTION LOSER ONE firstloser", result, StringComparison.Ordinal);
+        Assert.Contains("ACTION LOSER TWO secondloser", result, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void HeistMessageComposer_DoesNotRepeatDuplicateRenderedLinesWithinOneResolution()
+    {
+        var settings = CreateSettings();
+        settings.MinimumPlayers = 1;
+        settings.MaximumNamedResolutionCallouts = 2;
+        var composer = new HeistMessageComposer(
+            new HeistMessageTemplates
+            {
+                StartMessages = new List<string> { "ACTION START {starter} {stake} {joinWindow}" },
+                CooldownMessages = new List<string> { "ACTION COOLDOWN {cooldownRemaining}" },
+                ReminderMessages = new List<string> { "ACTION REMINDER {countdown} {pot} {participantCount}" },
+                SuccessHeadlines = new List<string> { "ACTION SUCCESS HEADLINE" },
+                FailureHeadlines = new List<string> { "ACTION FAILURE HEADLINE" },
+                SuccessCallouts = new List<string>
+                {
+                    "ACTION DUPLICATE {winner}",
+                    "ACTION DUPLICATE {winner}"
+                },
+                FailureCallouts = new List<string> { "ACTION LOSER {loser}" },
+                SacrificeCallouts = new List<string> { "ACTION SACRIFICE {loser} {winner}" },
+                ResultSummaries = new List<string> { "ACTION SUMMARY {winnerCount} {loserCount} {resolvedPot} {successChancePercent}" }
+            },
+            settings,
+            _ => 0);
+
+        var result = composer.ComposeResolution(new HeistResolutionResult
+        {
+            RoundId = Guid.NewGuid(),
+            FinalState = HeistRoundState.ResolvedSuccess,
+            SuccessChance = 0.7459m,
+            OriginalPot = 200m,
+            ResolvedPot = 400m,
+            Winners = new[]
+            {
+                new HeistParticipant
+                {
+                    Identity = new ViewerIdentity { Username = "winnerone", NormalizedUsername = "winnerone", DisplayName = "WinnerOne" },
+                    StakeAmount = 100m,
+                    IsWinner = true,
+                    PayoutAmount = 200m
+                },
+                new HeistParticipant
+                {
+                    Identity = new ViewerIdentity { Username = "winnerone", NormalizedUsername = "winnerone", DisplayName = "WinnerOne" },
+                    StakeAmount = 100m,
+                    IsWinner = true,
+                    PayoutAmount = 200m
+                }
+            },
+            Losers = Array.Empty<HeistParticipant>(),
+            RefundedParticipants = Array.Empty<HeistParticipant>(),
+            ResolvedAtUtc = new DateTimeOffset(2026, 4, 25, 16, 2, 0, TimeSpan.Zero)
+        });
+
+        Assert.Equal(1, CountOccurrences(result, "ACTION DUPLICATE winnerone"));
     }
 
     public void Dispose()

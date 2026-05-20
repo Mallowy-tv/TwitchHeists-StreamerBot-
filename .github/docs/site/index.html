@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TwitchHeists Docs</title>
+  <meta name="description" content="Organized documentation for installing, configuring, editing, and running TwitchHeists with Streamer.bot.">
+  <link rel="stylesheet" href="assets/site.css">
+  <script src="assets/site.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="shell">
+      <a class="brand" href="index.html">Twitch<span>Heists</span> Docs</a>
+      <nav class="nav" aria-label="Primary">
+        <a class="active" href="index.html">Home</a>
+        <a href="install.html">Install</a>
+        <a href="commands.html">Commands</a>
+        <a href="streamerbot.html">Streamer.bot</a>
+        <a href="editing.html">Editing</a>
+        <a href="downloads.html">Downloads</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="shell hero-grid">
+        <div class="hero-card">
+          <div class="eyebrow">🎮 Streamer.bot extension docs</div>
+          <h1>Run points, heists, raffles, and watchtime from one organized setup.</h1>
+          <p>
+            This site is the clean starting point for TwitchHeists: how to install it, what the commands do,
+            how Streamer.bot fits in, where to download files, and how to edit the behavior later.
+          </p>
+          <div class="hero-actions">
+            <a class="button primary" href="install.html">Start with install</a>
+            <a class="button" href="commands.html">See commands</a>
+            <a class="button" href="downloads.html">Open downloads</a>
+          </div>
+        </div>
+
+        <div class="hero-card stack">
+          <div class="mini-card">
+            <h3>📦 Install</h3>
+            <p>Use the release files or your local build output. Copy the extension payload into your Streamer.bot extension folder, then import <code>TwitchHeists.txt</code>.</p>
+          </div>
+          <div class="mini-card">
+            <h3>🧠 How it works</h3>
+            <p>The extension stores points and watchtime locally, tracks active viewers, runs heists and raffles, and lets Streamer.bot trigger the chat-side actions.</p>
+          </div>
+          <div class="mini-card">
+            <h3>🛠️ Edit it later</h3>
+            <p>You can tune settings in <code>appsettings.json</code>, change heist wording in <code>heist-messages.json</code>, and re-import <code>TwitchHeists.txt</code> when action definitions change.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="shell">
+        <div class="grid-3">
+          <article class="card">
+            <div class="badge">What TwitchHeists includes</div>
+            <h3>💰 Points and watchtime</h3>
+            <p>Active viewers earn points and lifetime watchtime on a repeating timer. Subscriber tiers earn more points from the same reward cycle.</p>
+          </article>
+          <article class="card">
+            <div class="badge">Built-in games</div>
+            <h3>🎉 Raffles and heists</h3>
+            <p>Mods can run raffles, chat can join for free, and viewers can risk their own points in heists for a shot at a bigger payout.</p>
+          </article>
+          <article class="card">
+            <div class="badge">Streamer.bot ready</div>
+            <h3>⚙️ Local storage</h3>
+            <p>Everything lives beside the extension in your Streamer.bot folder, including the SQLite database under <code>data\</code>.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="shell grid-2">
+        <article class="panel">
+          <h2>🚀 Fast path</h2>
+          <ol>
+            <li>Download the latest release or build the solution locally.</li>
+            <li>Copy the bridge release output into your Streamer.bot extension folder.</li>
+            <li>Import <code>TwitchHeists.txt</code> in Streamer.bot.</li>
+            <li>Enable Twitch present viewers live updates.</li>
+            <li>Adjust JSON settings only if you want custom timing, prizes, or messages.</li>
+          </ol>
+          <div class="button-row">
+            <a class="button" href="install.html">Install guide</a>
+            <a class="button" href="streamerbot.html">Streamer.bot guide</a>
+          </div>
+        </article>
+
+        <article class="panel">
+          <h2>📚 What each page covers</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Page</th>
+                  <th>Use it for</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><a href="install.html">Install</a></td>
+                  <td>File placement, local install script, and first setup.</td>
+                </tr>
+                <tr>
+                  <td><a href="commands.html">Commands</a></td>
+                  <td>Chat commands, reward tiers, raffle rules, and heist odds.</td>
+                </tr>
+                <tr>
+                  <td><a href="streamerbot.html">Streamer.bot</a></td>
+                  <td>How the import file, timers, and extension folder fit together.</td>
+                </tr>
+                <tr>
+                  <td><a href="editing.html">Editing</a></td>
+                  <td>How to change settings, messages, and redeploy updates.</td>
+                </tr>
+                <tr>
+                  <td><a href="downloads.html">Downloads</a></td>
+                  <td>Release links, local build paths, and quick file references.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="shell">
+        <article class="panel">
+          <h2>🧭 Suggested reading order</h2>
+          <div class="grid-3">
+            <div class="mini-card">
+              <h3>1. Install it</h3>
+              <p>Start with the extension folder, copied files, and import flow.</p>
+            </div>
+            <div class="mini-card">
+              <h3>2. Learn the commands</h3>
+              <p>See what chat can run and how rewards, raffles, and heists behave.</p>
+            </div>
+            <div class="mini-card">
+              <h3>3. Edit it safely</h3>
+              <p>Change JSON settings, redeploy the build output, and only re-import when action definitions change.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="shell">
+      TwitchHeists documentation site for GitHub Pages. Keep the app files in your Streamer.bot extension folder, and keep <code>data\</code> if you want to preserve your saved points and watchtime.
+    </div>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Commands | TwitchHeists Docs</title>
+  <link rel="stylesheet" href="assets/site.css">
+  <script src="assets/site.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="shell">
+      <a class="brand" href="index.html">Twitch<span>Heists</span> Docs</a>
+      <nav class="nav" aria-label="Primary">
+        <a href="index.html">Home</a>
+        <a href="install.html">Install</a>
+        <a class="active" href="commands.html">Commands</a>
+        <a href="streamerbot.html">Streamer.bot</a>
+        <a href="editing.html">Editing</a>
+        <a href="downloads.html">Downloads</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="hero">
+      <div class="hero-card">
+        <div class="eyebrow">💬 Commands</div>
+        <h1>What chat can do and how the game rules work.</h1>
+        <p>This page keeps the public-facing behavior in one place: points, watchtime, raffles, heists, and the default settings that shape them.</p>
+      </div>
+    </section>
+
+    <section class="section">
+      <article class="panel">
+        <h2>💰 Core chat commands</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Command</th>
+                <th>What it does</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td><code>!points</code></td><td>Shows your own points balance.</td></tr>
+              <tr><td><code>!points &lt;user&gt;</code></td><td>Shows another viewer's balance.</td></tr>
+              <tr><td><code>!leaderboard</code></td><td>Shows the top 5 point balances in chat.</td></tr>
+              <tr><td><code>!watchtime</code></td><td>Shows your tracked lifetime watchtime.</td></tr>
+              <tr><td><code>!watchtime &lt;user&gt;</code></td><td>Shows another viewer's tracked lifetime watchtime.</td></tr>
+              <tr><td><code>!points give &lt;user&gt; &lt;amount&gt;</code></td><td>Lets a viewer transfer some of their own points to someone else.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+    </section>
+
+    <section class="section grid-2">
+      <article class="panel">
+        <h2>🛠️ Mod / broadcaster commands</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Command</th>
+                <th>What it does</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td><code>!points add &lt;user&gt; &lt;amount&gt;</code></td><td>Adds points to one viewer.</td></tr>
+              <tr><td><code>!points remove &lt;user&gt; &lt;amount&gt;</code></td><td>Removes points from one viewer.</td></tr>
+              <tr><td><code>!raffle</code></td><td>Starts a multi-winner raffle using the default raffle prize from settings.</td></tr>
+              <tr><td><code>!raffle &lt;points&gt;</code></td><td>Starts a multi-winner raffle with a custom prize per winner.</td></tr>
+              <tr><td><code>!sraffle</code></td><td>Starts a single-winner raffle using the default raffle prize from settings.</td></tr>
+              <tr><td><code>!sraffle &lt;points&gt;</code></td><td>Starts a single-winner raffle with a custom prize.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="panel">
+        <h2>🎯 Join commands</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Command</th>
+                <th>What it does</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td><code>!heist &lt;amount&gt;</code></td><td>Starts a heist with the starting stake amount.</td></tr>
+              <tr><td><code>!join &lt;amount&gt;</code></td><td>Joins the current heist with your own stake.</td></tr>
+              <tr><td><code>!rjoin</code></td><td>Joins the current raffle for free.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+    </section>
+
+    <section class="section grid-2">
+      <article class="panel">
+        <h2>⏱️ Watchtime and subscriber bonuses</h2>
+        <p>With the default settings, TwitchHeists rewards active viewers every 5 minutes.</p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Viewer type</th>
+                <th>Multiplier</th>
+                <th>Default points every 5 minutes</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>Non-sub</td><td><code>x1.0</code></td><td><code>500</code></td></tr>
+              <tr><td>Tier 1 sub</td><td><code>x1.5</code></td><td><code>750</code></td></tr>
+              <tr><td>Tier 2 sub</td><td><code>x2.0</code></td><td><code>1000</code></td></tr>
+              <tr><td>Tier 3 sub</td><td><code>x3.0</code></td><td><code>1500</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p><code>!watchtime</code> shows lifetime rewarded watchtime, not just the current stream.</p>
+      </article>
+
+      <article class="panel">
+        <h2>🎉 Raffle rules</h2>
+        <ul>
+          <li><code>!raffle</code> = multiple winners.</li>
+          <li><code>!sraffle</code> = one winner only.</li>
+          <li><code>!rjoin</code> is free.</li>
+          <li>If you omit the amount, raffle commands fall back to <code>Raffle.WinnerPoints</code>.</li>
+          <li>With the default config, that fallback is <strong>5000 points</strong>.</li>
+        </ul>
+      </article>
+    </section>
+
+    <section class="section grid-2">
+      <article class="panel">
+        <h2>🏆 Multi-winner raffle tiers</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Entrants</th>
+                <th>Winners</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>1</td><td>1 winner</td></tr>
+              <tr><td>2-10</td><td>About half the field wins</td></tr>
+              <tr><td>11-20</td><td>About a quarter of the field wins</td></tr>
+              <tr><td>21-50</td><td>About one fifth of the field wins</td></tr>
+              <tr><td>51-200</td><td>About one eighth of the field wins</td></tr>
+              <tr><td>201+</td><td>About 5% of the field wins</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="panel">
+        <h2>💣 Heist rules</h2>
+        <ul>
+          <li><code>!heist &lt;amount&gt;</code> starts the run.</li>
+          <li><code>!join &lt;amount&gt;</code> joins the open run.</li>
+          <li>Both commands require a real amount.</li>
+          <li>If a viewer does not have enough points, they cannot start or join.</li>
+          <li>By default, a heist needs at least <strong>2 participants</strong>.</li>
+        </ul>
+      </article>
+    </section>
+
+    <section class="section">
+      <article class="panel">
+        <h2>🎲 Heist success chance</h2>
+        <p>The heist chance is designed to get easier as more people join, but harder as the total stake gets bigger.</p>
+        <ul>
+          <li>The default maximum chance is <strong>75%</strong>.</li>
+          <li>Every extra participant after the first adds <strong>3 percentage points</strong>.</li>
+          <li>Larger total stakes lower the chance.</li>
+          <li>The final chance is never allowed below <strong>40%</strong>.</li>
+          <li>The final chance is never allowed above <strong>75%</strong>.</li>
+        </ul>
+      </article>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="shell">
+      Want to tune these rules? Open <a href="editing.html">Editing</a> for the JSON settings and message files.
+    </div>
+  </footer>
+</body>
+</html>

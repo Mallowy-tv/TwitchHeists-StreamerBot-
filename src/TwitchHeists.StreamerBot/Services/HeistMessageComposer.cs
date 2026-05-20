@@ -108,13 +108,14 @@ public sealed class HeistMessageComposer
         parts.Add(SelectTemplate(isSuccess ? templates.SuccessHeadlines : templates.FailureHeadlines));
         parts.AddRange(BuildCallouts(resolution, isSuccess));
         parts.Add(BuildSummary(resolution));
-        return string.Join(" ", parts.Where(part => !string.IsNullOrWhiteSpace(part)));
+        return JoinUniqueParts(parts);
     }
 
     private IEnumerable<string> BuildCallouts(HeistResolutionResult resolution, bool isSuccess)
     {
         var callouts = new List<string>();
         var usedTemplates = new HashSet<string>(StringComparer.Ordinal);
+        var usedRenderedLines = new HashSet<string>(StringComparer.Ordinal);
         var maximumNamedCallouts = Math.Max(0, heistSettings.MaximumNamedResolutionCallouts);
         if (maximumNamedCallouts == 0)
         {
@@ -125,16 +126,22 @@ public sealed class HeistMessageComposer
         {
             if (resolution.Losers.Count > 0 && resolution.Winners.Count > 0 && callouts.Count < maximumNamedCallouts)
             {
-                var sacrificeTemplate = SelectTemplate(templates.SacrificeCallouts);
-                if (usedTemplates.Add(sacrificeTemplate))
+                var sacrificeTemplate = SelectTemplate(templates.SacrificeCallouts, usedTemplates);
+                if (!string.IsNullOrWhiteSpace(sacrificeTemplate))
                 {
-                    callouts.Add(
+                    var sacrificeLine =
                         ReplaceTokens(
                             sacrificeTemplate,
                             BuildParticipantTokens(
                                 resolution.Winners[0],
                                 resolution.Losers[0],
-                                resolution)));
+                                resolution));
+
+                    if (usedRenderedLines.Add(sacrificeLine))
+                    {
+                        usedTemplates.Add(sacrificeTemplate);
+                        callouts.Add(sacrificeLine);
+                    }
                 }
             }
 
@@ -145,19 +152,27 @@ public sealed class HeistMessageComposer
                     break;
                 }
 
-                var successTemplate = SelectTemplate(templates.SuccessCallouts);
-                if (!usedTemplates.Add(successTemplate))
+                var successTemplate = SelectTemplate(templates.SuccessCallouts, usedTemplates);
+                if (string.IsNullOrWhiteSpace(successTemplate))
                 {
-                    continue;
+                    break;
                 }
 
-                callouts.Add(
+                var successLine =
                     ReplaceTokens(
                         successTemplate,
                         BuildParticipantTokens(
                             winner,
                             resolution.Losers.Count > 0 ? resolution.Losers[0] : null,
-                            resolution)));
+                            resolution));
+
+                if (!usedRenderedLines.Add(successLine))
+                {
+                    continue;
+                }
+
+                usedTemplates.Add(successTemplate);
+                callouts.Add(successLine);
             }
 
             return callouts;
@@ -170,16 +185,24 @@ public sealed class HeistMessageComposer
                 break;
             }
 
-            var failureTemplate = SelectTemplate(templates.FailureCallouts);
-            if (!usedTemplates.Add(failureTemplate))
+            var failureTemplate = SelectTemplate(templates.FailureCallouts, usedTemplates);
+            if (string.IsNullOrWhiteSpace(failureTemplate))
             {
-                continue;
+            break;
             }
 
-            callouts.Add(
+            var failureLine =
                 ReplaceTokens(
                     failureTemplate,
-                    BuildParticipantTokens(null, loser, resolution)));
+                BuildParticipantTokens(null, loser, resolution));
+
+            if (!usedRenderedLines.Add(failureLine))
+            {
+            continue;
+            }
+
+            usedTemplates.Add(failureTemplate);
+            callouts.Add(failureLine);
         }
 
         return callouts;
@@ -221,18 +244,46 @@ public sealed class HeistMessageComposer
             return options[0];
         }
 
-        var index = chooseIndex(options.Count);
+        var index = ClampSelectedIndex(options.Count);
+        return options[index];
+    }
+
+    private string SelectTemplate(IReadOnlyList<string> options, ISet<string> excludedTemplates)
+    {
+        if (options.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        var availableOptions = options
+            .Where(option => !excludedTemplates.Contains(option))
+            .ToList();
+
+        if (availableOptions.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        if (availableOptions.Count == 1)
+        {
+            return availableOptions[0];
+        }
+
+        var index = ClampSelectedIndex(availableOptions.Count);
+        return availableOptions[index];
+    }
+
+    private int ClampSelectedIndex(int optionCount)
+    {
+        var index = chooseIndex(optionCount);
         if (index < 0)
         {
-            index = 0;
+            return 0;
         }
 
-        if (index >= options.Count)
-        {
-            index = options.Count - 1;
-        }
-
-        return options[index];
+        return index >= optionCount
+            ? optionCount - 1
+            : index;
     }
 
     private static string ReplaceTokens(string template, IReadOnlyDictionary<string, string> values)
@@ -244,6 +295,28 @@ public sealed class HeistMessageComposer
         }
 
         return result;
+    }
+
+    private static string JoinUniqueParts(IEnumerable<string> parts)
+    {
+        var uniqueParts = new List<string>();
+        var seenParts = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var part in parts)
+        {
+            if (string.IsNullOrWhiteSpace(part))
+            {
+                continue;
+            }
+
+            var trimmedPart = part.Trim();
+            if (seenParts.Add(trimmedPart))
+            {
+                uniqueParts.Add(trimmedPart);
+            }
+        }
+
+        return string.Join(" ", uniqueParts);
     }
 
     private static string FormatViewerName(ViewerIdentity identity)

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Editing | TwitchHeists Docs</title>
+  <link rel="stylesheet" href="assets/site.css">
+  <script src="assets/site.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="shell">
+      <a class="brand" href="index.html">Twitch<span>Heists</span> Docs</a>
+      <nav class="nav" aria-label="Primary">
+        <a href="index.html">Home</a>
+        <a href="install.html">Install</a>
+        <a href="commands.html">Commands</a>
+        <a href="streamerbot.html">Streamer.bot</a>
+        <a class="active" href="editing.html">Editing</a>
+        <a href="downloads.html">Downloads</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="hero">
+      <div class="hero-card">
+        <div class="eyebrow">🛠️ Editing</div>
+        <h1>Change timings, rewards, raffle defaults, and message text.</h1>
+        <p>You do not need to rebuild just to tune settings or rewrite heist chat lines. Most day-to-day edits are in JSON.</p>
+      </div>
+    </section>
+
+    <section class="section grid-2">
+      <article class="panel">
+        <h2>⚙️ appsettings.json</h2>
+        <p>Use <code>appsettings.json</code> for reward timing, subscriber multipliers, heist rules, and raffle defaults.</p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Section</th>
+                <th>Use it for</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td><code>Rewards</code></td><td>Reward interval, base points, and sub multipliers.</td></tr>
+              <tr><td><code>Heist</code></td><td>Join window, min/max success chance, minimum participants, and pot multiplier.</td></tr>
+              <tr><td><code>Raffle</code></td><td>Join window, reminder thresholds, and default winner points.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="panel">
+        <h2>🗨️ heist-messages.json</h2>
+        <p>Use <code>heist-messages.json</code> to change the chat lines used for starts, reminders, successes, failures, and join errors.</p>
+        <ul>
+          <li>Edit the arrays directly.</li>
+          <li>Save the file.</li>
+          <li>The next heist action run uses the new wording.</li>
+        </ul>
+        <p>You do not need to rebuild the DLLs just to change these chat messages.</p>
+      </article>
+    </section>
+
+    <section class="section">
+      <article class="panel">
+        <h2>🔁 Updating the install after you change code</h2>
+        <ol>
+          <li>Build the solution again.</li>
+          <li>Copy the new release output into your extension folder, or run the included local install script.</li>
+          <li>Only re-import <code>TwitchHeists.txt</code> if the Streamer.bot action definitions changed.</li>
+        </ol>
+        <pre><code>dotnet build .\TwitchHeists.sln -c Release</code></pre>
+      </article>
+    </section>
+
+    <section class="section grid-2">
+      <article class="panel">
+        <h2>📌 Common edits</h2>
+        <ul>
+          <li>Change raffle fallback prize: <code>Raffle.WinnerPoints</code></li>
+          <li>Change reward rate: <code>Rewards.BasePointsPerInterval</code></li>
+          <li>Change sub bonuses: <code>Tier1Multiplier</code>, <code>Tier2Multiplier</code>, <code>Tier3Multiplier</code></li>
+          <li>Change heist risk: <code>MinimumSuccessChance</code>, <code>MaximumSuccessChance</code>, <code>SuccessfulPotMultiplier</code></li>
+        </ul>
+      </article>
+
+      <article class="panel">
+        <h2>⚠️ Current storage note</h2>
+        <p>The current runtime stores the database in the extension-local <code>data\</code> folder. Keep that folder if you want your existing saved data to survive updates.</p>
+      </article>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="shell">
+      Need the exact file paths? Open <a href="downloads.html">Downloads</a>. Need the public behavior summary? Open <a href="commands.html">Commands</a>.
+    </div>
+  </footer>
+</body>
+</html>

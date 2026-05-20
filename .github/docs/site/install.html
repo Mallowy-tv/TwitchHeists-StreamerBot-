@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Install | TwitchHeists Docs</title>
+  <link rel="stylesheet" href="assets/site.css">
+  <script src="assets/site.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="shell">
+      <a class="brand" href="index.html">Twitch<span>Heists</span> Docs</a>
+      <nav class="nav" aria-label="Primary">
+        <a href="index.html">Home</a>
+        <a class="active" href="install.html">Install</a>
+        <a href="commands.html">Commands</a>
+        <a href="streamerbot.html">Streamer.bot</a>
+        <a href="editing.html">Editing</a>
+        <a href="downloads.html">Downloads</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="hero">
+      <div class="hero-card">
+        <div class="eyebrow">🚀 Install</div>
+        <h1>Get TwitchHeists into Streamer.bot.</h1>
+        <p>Use this if you want the shortest path from build output or release files to a working extension folder.</p>
+      </div>
+    </section>
+
+    <section class="section grid-2">
+      <article class="panel">
+        <h2>📁 Install location</h2>
+        <p>Copy the extension payload into a folder like this:</p>
+        <pre><code>D:\Streamer Bot\Extensions\TwitchHeist\</code></pre>
+        <div class="callout success">
+          Keep your <code>data\</code> folder if you want to preserve saved points, watchtime, and history.
+        </div>
+      </article>
+
+      <article class="panel">
+        <h2>📦 What belongs in that folder</h2>
+        <ul>
+          <li>The bridge release output from <code>src\TwitchHeists.StreamerBot.Bridge\bin\Release\net48\</code></li>
+          <li>The support DLLs and <code>runtimes\</code> folder that came with that output</li>
+          <li><code>appsettings.json</code> and <code>heist-messages.json</code></li>
+        </ul>
+        <div class="callout warning">
+          <code>TwitchHeists.txt</code> is imported in Streamer.bot. It is not part of the extension folder copy step in the local install script.
+        </div>
+      </article>
+    </section>
+
+    <section class="section">
+      <article class="panel">
+        <h2>⚡ Install with the local script</h2>
+        <p>If you build locally, use the included install script from the repository to copy the full deployable extension payload into your Streamer.bot folder.</p>
+        <p>Use the normal run for DLL updates, or the overwrite option if you also want to replace your JSON config files.</p>
+        <ul>
+          <li>It copies the DLLs, dependency files, and <code>runtimes\</code>.</li>
+          <li>It leaves your <code>data\</code> folder alone.</li>
+          <li>It does <strong>not</strong> copy <code>TwitchHeists.txt</code>.</li>
+        </ul>
+      </article>
+    </section>
+
+    <section class="section grid-2">
+      <article class="panel">
+        <h2>🧩 Manual install steps</h2>
+        <ol>
+          <li>Download the latest release or build the solution locally.</li>
+          <li>Copy the bridge release output into your Streamer.bot extension folder.</li>
+          <li>Import <code>TwitchHeists.txt</code> in Streamer.bot.</li>
+          <li>Enable <strong>Platforms &gt; Twitch &gt; Present Viewers &gt; Live Update</strong>.</li>
+        </ol>
+      </article>
+
+      <article class="panel">
+        <h2>✅ First checks</h2>
+        <ul>
+          <li>The folder contains the four TwitchHeists DLLs.</li>
+          <li>The folder contains the support DLLs and <code>runtimes\</code>.</li>
+          <li><code>appsettings.json</code> and <code>heist-messages.json</code> are present.</li>
+          <li>Your Streamer.bot actions are imported from <code>TwitchHeists.txt</code>.</li>
+        </ul>
+      </article>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="shell">
+      Need the release/build paths? Open <a href="downloads.html">Downloads</a>. Need the import flow? Open <a href="streamerbot.html">Streamer.bot</a>.
+    </div>
+  </footer>
+</body>
+</html>
