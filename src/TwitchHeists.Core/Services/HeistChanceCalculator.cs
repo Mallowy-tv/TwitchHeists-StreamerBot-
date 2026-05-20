@@ -13,11 +13,11 @@ public sealed class HeistChanceCalculator
 
     public decimal CalculateSuccessChance(decimal totalStake, int participantCount)
     {
-        var participantPressure = Math.Max(0, participantCount - 1) * 0.03m;
+        var participantBonus = Math.Max(0, participantCount - 1) * 0.03m;
         var stakePressure = totalStake <= 0
             ? 0m
             : Math.Min(0.20m, (decimal)Math.Log10((double)(totalStake / 1_000m) + 1d) * 0.10m);
-        var chance = heistSettings.MaximumSuccessChance - participantPressure - stakePressure;
+        var chance = heistSettings.MaximumSuccessChance + participantBonus - stakePressure;
 
         return Clamp(chance, heistSettings.MinimumSuccessChance, heistSettings.MaximumSuccessChance);
     }

@@ -65,6 +65,48 @@ public sealed class BridgeActionsTests : IDisposable
     }
 
     [Fact]
+    public void RefreshCommunityViewers_LoadsRewardsSettingsFromConfiguration()
+    {
+        EnsureInstallDirectory(
+            configurationJson: BuildRewardsConfigurationJson(
+                rewardInterval: "00:07:00",
+                basePointsPerInterval: 1000m,
+                tier1Multiplier: 1.25m,
+                tier2Multiplier: 2.5m,
+                tier3Multiplier: 4.0m));
+        var actions = new BridgeActions();
+        var refreshedAt = new DateTimeOffset(2026, 4, 23, 20, 0, 0, TimeSpan.Zero);
+
+        var refreshResult = actions.RefreshCommunityViewers(
+            installDirectory,
+            refreshedAt,
+            new[]
+            {
+                new BridgeCommunityViewer
+                {
+                    TwitchUserId = "tier-three-1",
+                    Username = "viewerone",
+                    DisplayName = "ViewerOne",
+                    SubscriberTier = 3
+                }
+            });
+        var watchtimeResult = actions.GetWatchtime(
+            installDirectory,
+            new BridgeWatchtimeQuery
+            {
+                RequesterTwitchUserId = "tier-three-1",
+                RequesterUsername = "viewerone",
+                RequesterDisplayName = "ViewerOne",
+                OccurredAtUtc = refreshedAt
+            });
+
+        Assert.True(refreshResult.Success);
+        Assert.Equal(4000m, refreshResult.TotalPointsAwarded);
+        Assert.True(watchtimeResult.Success);
+        Assert.Contains("7m", watchtimeResult.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void StartStreamAndEndStream_ReturnFriendlyLifecycleMessages()
     {
         EnsureInstallDirectory();
@@ -731,6 +773,57 @@ public sealed class BridgeActionsTests : IDisposable
     }
 
     [Fact]
+    public void RaffleActions_LoadRaffleSettingsFromConfiguration()
+    {
+        EnsureInstallDirectory(
+            configurationJson: BuildRaffleConfigurationJson(
+                joinWindow: "00:03:00",
+                oneMinuteReminderThreshold: "00:02:30",
+                thirtySecondReminderThreshold: "00:01:45",
+                tenSecondReminderThreshold: "00:01:15",
+                winnerPoints: 4321m,
+                moderatorPointsLimit: 5000m));
+        SeedBalance("viewerone", 1000m, 0);
+        SeedActivePresence("viewerone", "ViewerOne");
+        var actions = new BridgeActions();
+        var startedAt = new DateTimeOffset(2026, 5, 16, 16, 0, 0, TimeSpan.Zero);
+
+        var startResult = actions.RunRaffle(
+            installDirectory,
+            new BridgeRaffleCommand
+            {
+                SourceUsername = "moduser",
+                IsBroadcaster = false,
+                OccurredAtUtc = startedAt
+            });
+        var joinResult = actions.JoinRaffle(
+            installDirectory,
+            new BridgeRaffleCommand
+            {
+                SourceUsername = "viewerone",
+                SourceDisplayName = "ViewerOne",
+                OccurredAtUtc = startedAt.AddSeconds(5)
+            });
+        var oneMinuteReminder = actions.ResolveDueRaffles(installDirectory, startedAt.AddSeconds(40));
+        var thirtySecondReminder = actions.ResolveDueRaffles(installDirectory, startedAt.AddSeconds(80));
+        var tenSecondReminder = actions.ResolveDueRaffles(installDirectory, startedAt.AddSeconds(110));
+        var resolution = actions.ResolveDueRaffles(installDirectory, startedAt.AddMinutes(3));
+
+        Assert.True(startResult.Success);
+        Assert.True(joinResult.Success);
+        Assert.Contains("4321 points", startResult.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("3 minutes", startResult.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.True(oneMinuteReminder.Success);
+        Assert.Contains("1 minute", oneMinuteReminder.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.True(thirtySecondReminder.Success);
+        Assert.Contains("30 seconds", thirtySecondReminder.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.True(tenSecondReminder.Success);
+        Assert.Contains("10 seconds", tenSecondReminder.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.True(resolution.Success);
+        Assert.Contains("4321 points", resolution.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void RunSingleWinnerRaffle_StartsScheduledRound()
     {
         EnsureInstallDirectory();
@@ -1093,6 +1186,50 @@ public sealed class BridgeActionsTests : IDisposable
                 "MaximumWinnerCount": 5,
                 "MaximumNamedResolutionCallouts": {{maximumNamedResolutionCallouts}},
                 "SuccessfulPotMultiplier": 2.0
+              }
+            }
+            """;
+    }
+
+    private static string BuildRewardsConfigurationJson(
+        string rewardInterval,
+        decimal basePointsPerInterval,
+        decimal tier1Multiplier,
+        decimal tier2Multiplier,
+        decimal tier3Multiplier)
+    {
+        return
+            $$"""
+            {
+              "Rewards": {
+                "RewardInterval": "{{rewardInterval}}",
+                "BasePointsPerInterval": {{basePointsPerInterval.ToString(CultureInfo.InvariantCulture)}},
+                "Tier1Multiplier": {{tier1Multiplier.ToString(CultureInfo.InvariantCulture)}},
+                "Tier2Multiplier": {{tier2Multiplier.ToString(CultureInfo.InvariantCulture)}},
+                "Tier3Multiplier": {{tier3Multiplier.ToString(CultureInfo.InvariantCulture)}}
+              }
+            }
+            """;
+    }
+
+    private static string BuildRaffleConfigurationJson(
+        string joinWindow,
+        string oneMinuteReminderThreshold,
+        string thirtySecondReminderThreshold,
+        string tenSecondReminderThreshold,
+        decimal winnerPoints,
+        decimal moderatorPointsLimit)
+    {
+        return
+            $$"""
+            {
+              "Raffle": {
+                "JoinWindow": "{{joinWindow}}",
+                "OneMinuteReminderThreshold": "{{oneMinuteReminderThreshold}}",
+                "ThirtySecondReminderThreshold": "{{thirtySecondReminderThreshold}}",
+                "TenSecondReminderThreshold": "{{tenSecondReminderThreshold}}",
+                "WinnerPoints": {{winnerPoints.ToString(CultureInfo.InvariantCulture)}},
+                "ModeratorPointsLimit": {{moderatorPointsLimit.ToString(CultureInfo.InvariantCulture)}}
               }
             }
             """;

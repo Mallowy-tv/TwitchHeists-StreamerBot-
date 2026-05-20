@@ -1720,7 +1720,10 @@ public bool Execute()
     SetProperty(command, "SourceUsername", sourceUsername);
     SetProperty(command, "SourceDisplayName", sourceDisplayName);
     SetProperty(command, "IsBroadcaster", isBroadcaster);
-    SetProperty(command, "WinnerPoints", winnerPoints);
+    if (winnerPoints.HasValue)
+    {
+        SetProperty(command, "WinnerPoints", winnerPoints);
+    }
     SetProperty(command, "OccurredAtUtc", DateTimeOffset.UtcNow);
 
     var result = InvokeBridge(bridgeActions, "RunRaffle", InstallDir, command);
@@ -1825,9 +1828,9 @@ public bool Execute()
         return GetOptionalBoolArg("isBroadcaster", "broadcaster");
     }
 
-    private decimal GetRaffleWinnerPoints()
+    private decimal? GetRaffleWinnerPoints()
     {
-        var rawInput = GetOptionalStringArg("input0");
+        var rawInput = GetOptionalStringArg("input0", "input");
         if (!string.IsNullOrWhiteSpace(rawInput) &&
             decimal.TryParse(rawInput, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsedAmount) &&
             parsedAmount > 0)
@@ -1835,7 +1838,7 @@ public bool Execute()
             return parsedAmount;
         }
 
-        return 5000m;
+        return null;
     }
 
     private bool GetOptionalBoolArg(params string[] argNames)
@@ -1915,7 +1918,10 @@ public bool Execute()
     SetProperty(command, "SourceUsername", sourceUsername);
     SetProperty(command, "SourceDisplayName", sourceDisplayName);
     SetProperty(command, "IsBroadcaster", isBroadcaster);
-    SetProperty(command, "WinnerPoints", winnerPoints);
+    if (winnerPoints.HasValue)
+    {
+        SetProperty(command, "WinnerPoints", winnerPoints);
+    }
     SetProperty(command, "OccurredAtUtc", DateTimeOffset.UtcNow);
 
     var result = InvokeBridge(bridgeActions, "RunSingleWinnerRaffle", InstallDir, command);
@@ -2020,9 +2026,9 @@ public bool Execute()
         return GetOptionalBoolArg("isBroadcaster", "broadcaster");
     }
 
-    private decimal GetRaffleWinnerPoints()
+    private decimal? GetRaffleWinnerPoints()
     {
-        var rawInput = GetOptionalStringArg("input0");
+        var rawInput = GetOptionalStringArg("input0", "input");
         if (!string.IsNullOrWhiteSpace(rawInput) &&
             decimal.TryParse(rawInput, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsedAmount) &&
             parsedAmount > 0)
@@ -2030,7 +2036,7 @@ public bool Execute()
             return parsedAmount;
         }
 
-        return 5000m;
+        return null;
     }
 
     private bool GetOptionalBoolArg(params string[] argNames)
